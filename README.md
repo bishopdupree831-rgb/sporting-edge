@@ -1,0 +1,40 @@
+# EdgeLab Sports Intelligence
+
+A deployable sports research dashboard inspired by AI sports-analysis tools. It supports NFL, MLB, NBA, and MMA with:
+
+- Research chat over local slate data
+- Insights feed
+- Player/fighter profiles
+- Rankings
+- Parlay-style research card builder
+- FastAPI `/api` engine with simulation, edge, confidence, sharp filter, and first-action probabilities
+
+This app is for entertainment and research. It is not gambling, betting, or financial advice.
+
+## Run Locally
+
+```bash
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+Open `http://127.0.0.1:8000`.
+
+## Share With Friends
+
+Deploy the folder to a Python web host such as Render, Railway, Fly.io, or a VPS.
+
+For Render:
+
+1. Push this folder to a GitHub repository.
+2. In Render, choose **New +** then **Blueprint** and select the repository.
+3. Render will read `render.yaml`, install the requirements, start the app, and check `/health`.
+4. Share the public URL Render gives you.
+
+Manual Render setup also works:
+
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- Health check path: `/health`
+
+The included `Procfile` and `Dockerfile` are there for hosts that detect either style automatically.

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EdgeLab Sports Intelligence</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">EL</div>
+          <div>
+            <strong>EdgeLab</strong>
+            <span>Sports Intelligence</span>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Primary">
+          <button class="nav-item active" data-view="research" title="Research">
+            <span>⌕</span> Research
+          </button>
+          <button class="nav-item" data-view="insights" title="Insights">
+            <span>◧</span> Insights
+          </button>
+          <button class="nav-item" data-view="players" title="Players">
+            <span>◉</span> Players
+          </button>
+          <button class="nav-item" data-view="parlay" title="Parlay Builder">
+            <span>＋</span> Parlay Builder
+          </button>
+          <button class="nav-item" data-view="rankings" title="Rankings">
+            <span>⇅</span> Rankings
+          </button>
+          <button class="nav-item" data-view="engine" title="Engine">
+            <span>◌</span> Engine
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <span class="live-dot"></span>
+          Sample slate loaded
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">NFL, MLB, NBA, MMA sample slate</p>
+            <h1 id="view-title">Ask a sports research question</h1>
+          </div>
+          <div class="controls">
+            <select id="sport-filter" aria-label="Sport filter">
+              <option value="All">All sports</option>
+              <option value="NBA">NBA</option>
+              <option value="NFL">NFL</option>
+              <option value="MLB">MLB</option>
+              <option value="MMA">MMA</option>
+            </select>
+            <button id="refresh-btn" class="icon-btn" title="Refresh sample signals">↻</button>
+          </div>
+        </header>
+
+        <section id="research" class="view active">
+          <div class="research-grid">
+            <section class="chat-panel">
+              <div id="chat-log" class="chat-log" aria-live="polite"></div>
+              <form id="chat-form" class="chat-form">
+                <input
+                  id="chat-input"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Ask about a player, prop, matchup, trend, or parlay..."
+                />
+                <button type="submit">Ask</button>
+              </form>
+            </section>
+            <aside class="quick-panel">
+              <h2>Inspired questions</h2>
+              <div id="quick-prompts" class="prompt-list"></div>
+              <h2>Research mode</h2>
+              <div class="segmented" role="group" aria-label="Research mode">
+                <button class="mode active" data-mode="quick">Quick</button>
+                <button class="mode" data-mode="full">Full</button>
+              </div>
+              <div class="note">
+                Uses local sample data only. This is not gambling or financial advice.
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="insights" class="view">
+          <div class="toolbar">
+            <input id="insight-search" type="search" placeholder="Filter insights..." />
+            <select id="edge-filter" aria-label="Edge filter">
+              <option value="All">All edges</option>
+              <option value="Usage">Usage</option>
+              <option value="Matchup">Matchup</option>
+              <option value="Market">Market</option>
+              <option value="Injury">Injury</option>
+            </select>
+          </div>
+          <div id="insight-list" class="insight-list"></div>
+        </section>
+
+        <section id="players" class="view">
+          <div id="player-grid" class="player-grid"></div>
+        </section>
+
+        <section id="parlay" class="view">
+          <div class="builder">
+            <section class="builder-panel">
+              <h2>Build a correlated card</h2>
+              <label>
+                Legs
+                <input id="legs-input" type="number" min="2" max="5" value="3" />
+              </label>
+              <label>
+                Risk profile
+                <select id="risk-input">
+                  <option value="balanced">Balanced</option>
+                  <option value="safer">Higher confidence</option>
+                  <option value="upside">Higher upside</option>
+                </select>
+              </label>
+              <label>
+                Focus
+                <select id="focus-input">
+                  <option value="All">Best available</option>
+                  <option value="NBA">NBA</option>
+                  <option value="NFL">NFL</option>
+                  <option value="MLB">MLB</option>
+                  <option value="MMA">MMA</option>
+                </select>
+              </label>
+              <button id="build-parlay">Generate card</button>
+            </section>
+            <section id="parlay-output" class="parlay-output"></section>
+          </div>
+        </section>
+
+        <section id="rankings" class="view">
+          <div class="rankings-head">
+            <h2>Today's strongest sample plays</h2>
+            <span>Sorted by confidence, recent form, and matchup lift</span>
+          </div>
+          <div id="ranking-table" class="ranking-table"></div>
+        </section>
+
+        <section id="engine" class="view">
+          <div class="engine-grid">
+            <section class="engine-panel">
+              <div class="card-top">
+                <h2>Sharp filter</h2>
+                <span id="engine-status" class="pill">Local mode</span>
+              </div>
+              <div id="top-bets" class="engine-list"></div>
+            </section>
+            <section class="engine-panel">
+              <h2>First-shot model</h2>
+              <div id="first-shot" class="engine-list"></div>
+            </section>
+            <section class="engine-panel span-2">
+              <h2>Engine insights</h2>
+              <div id="engine-insights" class="engine-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="player-dialog">
+      <button id="close-dialog" class="close-btn" title="Close">×</button>
+      <div id="dialog-content"></div>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>

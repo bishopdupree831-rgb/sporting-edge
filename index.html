@@ -58,11 +58,57 @@
               <option value="MLB">MLB</option>
               <option value="MMA">MMA</option>
             </select>
+            <select id="team-filter" aria-label="Team filter">
+              <option value="All">All teams</option>
+            </select>
             <button id="refresh-btn" class="icon-btn" title="Refresh sample signals">↻</button>
           </div>
         </header>
 
         <section id="research" class="view active">
+          <form id="prediction-form" class="prediction-form">
+            <div>
+              <h2>Prediction lab</h2>
+              <p class="muted">Type any player, team, or prop. Live API keys can be added later; this model works immediately with broad sport/market logic.</p>
+            </div>
+            <div class="form-grid prediction-grid">
+              <label>
+                Sport
+                <select id="predict-sport">
+                  <option value="NFL">NFL</option>
+                  <option value="MLB">MLB</option>
+                  <option value="NBA">NBA</option>
+                  <option value="MMA">MMA</option>
+                </select>
+              </label>
+              <label>
+                Player or fighter
+                <input id="predict-player" list="player-suggestions" placeholder="Any player name" />
+              </label>
+              <label>
+                Team or matchup
+                <input id="predict-team" list="team-suggestions" placeholder="Chiefs, Lakers, Yankees..." />
+              </label>
+              <label>
+                Prop market
+                <input id="predict-market" list="market-suggestions" required placeholder="Passing Yards" />
+              </label>
+              <label>
+                Line
+                <input id="predict-line" required type="number" step="0.5" placeholder="252.5" />
+              </label>
+              <label>
+                Odds
+                <input id="predict-odds" type="number" step="1" placeholder="-110" />
+              </label>
+            </div>
+            <button type="submit">Predict</button>
+          </form>
+          <datalist id="player-suggestions"></datalist>
+          <datalist id="team-suggestions"></datalist>
+          <datalist id="market-suggestions"></datalist>
+          <section id="prediction-output" class="prediction-output"></section>
+
           <div class="research-grid">
             <section class="chat-panel">
               <div id="chat-log" class="chat-log" aria-live="polite"></div>
@@ -106,6 +152,44 @@
         </section>
 
         <section id="players" class="view">
+          <form id="custom-player-form" class="custom-form">
+            <div>
+              <h2>Add any player, fighter, or team prop</h2>
+              <p class="muted">Saved in this browser and included in research, rankings, insights, and parlays.</p>
+            </div>
+            <div class="form-grid">
+              <label>
+                Name
+                <input id="custom-name" required placeholder="Patrick Mahomes" />
+              </label>
+              <label>
+                Sport
+                <select id="custom-sport">
+                  <option value="NFL">NFL</option>
+                  <option value="MLB">MLB</option>
+                  <option value="NBA">NBA</option>
+                  <option value="MMA">MMA</option>
+                </select>
+              </label>
+              <label>
+                Team
+                <input id="custom-team" required placeholder="KC" />
+              </label>
+              <label>
+                Opponent
+                <input id="custom-opponent" required placeholder="BUF" />
+              </label>
+              <label>
+                Market
+                <input id="custom-market" required placeholder="Passing Yards" />
+              </label>
+              <label>
+                Line
+                <input id="custom-line" required type="number" step="0.5" placeholder="252.5" />
+              </label>
+            </div>
+            <button type="submit">Add to slate</button>
+          </form>
           <div id="player-grid" class="player-grid"></div>
         </section>
 

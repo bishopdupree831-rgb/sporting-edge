@@ -1,4 +1,6 @@
-const players = [
+const CUSTOM_PLAYERS_KEY = "edgelab.customPlayers";
+
+const basePlayers = [
   {
     name: "Jalen Brunson",
     sport: "NBA",
@@ -113,6 +115,9 @@ const players = [
   }
 ];
 
+let customPlayers = loadCustomPlayers();
+let players = [...basePlayers, ...customPlayers];
+
 const insights = [
   {
     type: "Usage",
@@ -199,9 +204,42 @@ const titles = {
 
 let activeMode = "quick";
 let engineSnapshot = null;
+let catalog = {
+  teams: {},
+  markets: {},
+  sample_players: []
+};
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+function loadCustomPlayers() {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_PLAYERS_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomPlayers() {
+  localStorage.setItem(CUSTOM_PLAYERS_KEY, JSON.stringify(customPlayers));
+  players = [...basePlayers, ...customPlayers];
+}
+
+function makeRecent(line, confidence) {
+  const center = line * (0.9 + confidence / 180);
+  return Array.from({ length: 10 }, (_, index) => {
+    const wave = Math.sin(index * 1.7) * line * 0.14;
+    const drift = (index % 3 - 1) * line * 0.07;
+    return Number(Math.max(0, center + wave + drift).toFixed(1));
+  });
+}
+
+function estimateConfidence(line, sport) {
+  const sportBase = { NFL: 70, MLB: 66, NBA: 69, MMA: 63 }[sport] || 66;
+  const lineDrag = line > 50 ? 4 : line > 10 ? 2 : 0;
+  return Math.max(58, Math.min(82, sportBase - lineDrag));
+}
 
 function hitRate(player) {
   const hits = player.recent.filter((value) => value > player.line).length;
@@ -214,7 +252,143 @@ function avg(values) {
 
 function filteredPlayers() {
   const sport = $("#sport-filter").value;
-  return sport === "All" ? players : players.filter((player) => player.sport === sport);
+  const team = $("#team-filter").value;
+  return players.filter((player) => {
+    const matchesSport = sport === "All" || player.sport === sport;
+    const matchesTeam = team === "All" || player.team === team || player.opponent === team;
+    return matchesSport && matchesTeam;
+  });
+}
+
+function renderTeamFilter() {
+  const current = $("#team-filter").value;
+  const sport = $("#sport-filter").value;
+  const teams = [...new Set(players
+    .filter((player) => sport === "All" || player.sport === sport)
+    .flatMap((player) => [player.team, player.opponent])
+    .filter(Boolean)
+  )].sort();
+
+  $("#team-filter").innerHTML = `<option value="All">All teams</option>${teams.map((team) => `<option value="${team}">${team}</option>`).join("")}`;
+  $("#team-filter").value = teams.includes(current) ? current : "All";
+}
+
+async function loadCatalog() {
+  try {
+    const response = await fetch("/api/catalog", { cache: "no-store" });
+    if (!response.ok) throw new Error("Catalog unavailable");
+    catalog = await response.json();
+  } catch {
+    catalog = {
+      teams: {
+        NFL: ["Kansas City Chiefs", "Buffalo Bills", "Dallas Cowboys", "Philadelphia Eagles"],
+        MLB: ["New York Yankees", "Los Angeles Dodgers", "Atlanta Braves", "Houston Astros"],
+        NBA: ["Los Angeles Lakers", "Boston Celtics", "New York Knicks", "Dallas Mavericks"],
+        MMA: ["UFC", "Bellator", "PFL", "ONE Championship"]
+      },
+      markets: {
+        NFL: ["Passing Yards", "Rushing Yards", "Receiving Yards", "Receptions", "Anytime Touchdown"],
+        MLB: ["Hits", "Total Bases", "Home Runs", "Pitcher Strikeouts"],
+        NBA: ["Points", "Rebounds", "Assists", "Threes"],
+        MMA: ["Moneyline", "Significant Strikes", "Takedowns", "Fight Goes Distance"]
+      },
+      sample_players: basePlayers
+    };
+  }
+  renderPredictionSuggestions();
+}
+
+function renderPredictionSuggestions() {
+  const sport = $("#predict-sport").value;
+  const teams = catalog.teams?.[sport] || [];
+  const markets = catalog.markets?.[sport] || [];
+  const names = [...new Set([
+    ...basePlayers.filter((player) => player.sport === sport).map((player) => player.name),
+    ...customPlayers.filter((player) => player.sport === sport).map((player) => player.name)
+  ])].sort();
+
+  $("#team-suggestions").innerHTML = teams.map((team) => `<option value="${team}"></option>`).join("");
+  $("#market-suggestions").innerHTML = markets.map((market) => `<option value="${market}"></option>`).join("");
+  $("#player-suggestions").innerHTML = names.map((name) => `<option value="${name}"></option>`).join("");
+}
+
+function localPrediction(payload) {
+  const confidence = estimateConfidence(payload.line, payload.sport);
+  const recent = makeRecent(payload.line, confidence);
+  const rate = recent.filter((value) => value > payload.line).length / recent.length;
+  const implied = oddsToProbability(payload.odds || -110);
+  const edge = rate - implied;
+  const recommendation = edge > 0.06 ? "Play" : edge < -0.06 ? "Fade" : "Watch";
+
+  return {
+    ...payload,
+    subject: payload.player || payload.team || "Unknown",
+    projection: Number((recent.reduce((sum, value) => sum + value, 0) / recent.length).toFixed(2)),
+    hit_rate: Number(rate.toFixed(3)),
+    implied_probability: Number(implied.toFixed(3)),
+    edge: Number(edge.toFixed(3)),
+    confidence: Number((rate * (1 - Math.min(Math.abs(edge), 0.35))).toFixed(3)),
+    recommendation,
+    explanation: "Local browser model. Add ODDS_API_KEY in Render for live event and odds access."
+  };
+}
+
+function oddsToProbability(odds) {
+  return odds > 0 ? 100 / (odds + 100) : Math.abs(odds) / (Math.abs(odds) + 100);
+}
+
+async function submitPrediction(event) {
+  event.preventDefault();
+  const payload = {
+    sport: $("#predict-sport").value,
+    player: $("#predict-player").value.trim(),
+    team: $("#predict-team").value.trim(),
+    market: $("#predict-market").value.trim(),
+    line: Number($("#predict-line").value),
+    odds: Number($("#predict-odds").value || -110)
+  };
+
+  let result;
+  try {
+    const response = await fetch("/api/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("Prediction API unavailable");
+    result = await response.json();
+  } catch {
+    result = localPrediction(payload);
+  }
+
+  renderPrediction(result);
+}
+
+function renderPrediction(result) {
+  const statusClass = result.recommendation === "Play" ? "play" : result.recommendation === "Fade" ? "fade" : "";
+  $("#prediction-output").classList.add("active");
+  $("#prediction-output").innerHTML = `
+    <div class="prediction-result">
+      <div class="prediction-head">
+        <div>
+          <h2>${result.subject} ${result.market}</h2>
+          <p class="muted">${result.sport}${result.team ? ` · ${result.team}` : ""} · line ${result.line} · odds ${result.odds}</p>
+        </div>
+        <span class="recommendation ${statusClass}">${result.recommendation}</span>
+      </div>
+      <div class="confidence">
+        <strong>${Math.round(result.confidence * 100)}% confidence</strong>
+        <div class="bar"><span style="width:${Math.round(result.confidence * 100)}%"></span></div>
+      </div>
+      <p>${result.explanation}</p>
+      <div class="metric-row">
+        <span class="pill">projection ${result.projection}</span>
+        <span class="pill">hit ${Math.round(result.hit_rate * 100)}%</span>
+        <span class="pill">implied ${Math.round(result.implied_probability * 100)}%</span>
+        <span class="pill">edge ${result.edge}</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderChatIntro() {
@@ -278,7 +452,16 @@ function renderInsights() {
   const search = $("#insight-search").value.toLowerCase();
   const sport = $("#sport-filter").value;
   const edge = $("#edge-filter").value;
-  const rows = insights.filter((insight) => {
+  const customInsights = customPlayers.map((player) => ({
+    type: "Market",
+    sport: player.sport,
+    title: `${player.name} added to your slate`,
+    body: `${player.market} ${player.line} is now available in chat, rankings, profiles, and parlay generation.`,
+    player: player.name,
+    score: player.confidence
+  }));
+  const allInsights = [...insights, ...customInsights];
+  const rows = allInsights.filter((insight) => {
     const matchesSport = sport === "All" || insight.sport === sport;
     const matchesEdge = edge === "All" || insight.type === edge;
     const matchesSearch = `${insight.title} ${insight.body} ${insight.player}`.toLowerCase().includes(search);
@@ -317,11 +500,15 @@ function renderPlayers() {
         <span>Recent hit rate ${hitRate(player)}%</span>
         <div class="bar"><span style="width:${hitRate(player)}%"></span></div>
       </div>
-      <button class="prompt open-player" data-player="${player.name}">Open profile</button>
+      <div class="metric-row">
+        <button class="prompt open-player" data-player="${player.name}">Open profile</button>
+        ${player.custom ? `<button class="remove-player" data-player="${player.name}">Remove</button>` : ""}
+      </div>
     </article>
   `).join("");
 
   $$(".open-player").forEach((button) => button.addEventListener("click", () => openPlayer(button.dataset.player)));
+  $$(".remove-player").forEach((button) => button.addEventListener("click", () => removeCustomPlayer(button.dataset.player)));
 }
 
 function openPlayer(name) {
@@ -500,11 +687,48 @@ function switchView(view) {
 }
 
 function refreshAll() {
+  renderTeamFilter();
   renderInsights();
   renderPlayers();
   renderParlay();
   renderRankings();
   renderEngine();
+}
+
+function addCustomPlayer(event) {
+  event.preventDefault();
+  const sport = $("#custom-sport").value;
+  const line = Number($("#custom-line").value);
+  const confidence = estimateConfidence(line, sport);
+  const name = $("#custom-name").value.trim();
+
+  const player = {
+    name,
+    sport,
+    team: $("#custom-team").value.trim().toUpperCase(),
+    opponent: $("#custom-opponent").value.trim().toUpperCase(),
+    market: $("#custom-market").value.trim(),
+    line,
+    recent: makeRecent(line, confidence),
+    usage: Math.round(confidence * 0.4),
+    matchup: Math.max(5, Math.min(9, Math.round(confidence / 10))),
+    confidence,
+    note: "Custom slate entry. Replace the line or market any time by removing it and adding an updated version.",
+    hotspots: [[40, 44], [56, 52], [48, 68]],
+    custom: true
+  };
+
+  customPlayers = customPlayers.filter((item) => item.name.toLowerCase() !== name.toLowerCase());
+  customPlayers.push(player);
+  saveCustomPlayers();
+  $("#custom-player-form").reset();
+  refreshAll();
+}
+
+function removeCustomPlayer(name) {
+  customPlayers = customPlayers.filter((player) => player.name !== name);
+  saveCustomPlayers();
+  refreshAll();
 }
 
 $$(".nav-item").forEach((item) => item.addEventListener("click", () => switchView(item.dataset.view)));
@@ -523,9 +747,13 @@ $("#chat-form").addEventListener("submit", (event) => {
 });
 
 $("#sport-filter").addEventListener("change", refreshAll);
+$("#team-filter").addEventListener("change", refreshAll);
+$("#predict-sport").addEventListener("change", renderPredictionSuggestions);
 $("#edge-filter").addEventListener("change", renderInsights);
 $("#insight-search").addEventListener("input", renderInsights);
 $("#build-parlay").addEventListener("click", renderParlay);
+$("#custom-player-form").addEventListener("submit", addCustomPlayer);
+$("#prediction-form").addEventListener("submit", submitPrediction);
 $("#refresh-btn").addEventListener("click", () => {
   players.forEach((player) => {
     player.confidence = Math.max(58, Math.min(91, player.confidence + Math.round(Math.random() * 6 - 3)));
@@ -538,5 +766,6 @@ $("#close-dialog").addEventListener("click", () => $("#player-dialog").close());
 renderQuickPrompts();
 renderChatIntro();
 refreshAll();
+loadCatalog();
 loadEngineSnapshot();
 setInterval(loadEngineSnapshot, 15000);

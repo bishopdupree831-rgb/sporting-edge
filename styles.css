@@ -216,6 +216,9 @@ input {
 .player-card,
 .insight-card,
 .engine-panel,
+.custom-form,
+.prediction-form,
+.prediction-output,
 .ranking-table {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -300,8 +303,88 @@ input {
 
 .quick-panel,
 .builder-panel,
-.parlay-output {
+.parlay-output,
+.custom-form,
+.prediction-form,
+.prediction-output {
   padding: 18px;
+}
+
+.custom-form,
+.prediction-form {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.custom-form h2,
+.prediction-form h2 {
+  margin-bottom: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.custom-form label,
+.prediction-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.custom-form button,
+.prediction-form button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 800;
+  background: var(--green);
+}
+
+.prediction-output {
+  display: none;
+  margin-bottom: 16px;
+}
+
+.prediction-output.active {
+  display: block;
+}
+
+.prediction-result {
+  display: grid;
+  gap: 12px;
+}
+
+.prediction-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recommendation {
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  background: var(--gold);
+}
+
+.recommendation.play {
+  background: var(--green);
+}
+
+.recommendation.fade {
+  background: var(--red);
 }
 
 .prompt-list {
@@ -315,6 +398,16 @@ input {
   border: 1px solid var(--line);
   border-radius: 8px;
   text-align: left;
+  background: #fff;
+}
+
+.remove-player {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--red);
   background: #fff;
 }
 
@@ -598,7 +691,8 @@ dialog::backdrop {
 
   .research-grid,
   .builder,
-  .profile {
+  .profile,
+  .form-grid {
     grid-template-columns: 1fr;
   }
 

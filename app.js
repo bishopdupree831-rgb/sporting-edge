@@ -1,4 +1,7 @@
 const CUSTOM_PLAYERS_KEY = "edgelab.customPlayers";
+const WATCHLIST_KEY = "edgelab.watchlist";
+const AUTH_TOKEN_KEY = "edgelab.authToken";
+const THEME_KEY = "edgelab.theme";
 
 const basePlayers = [
   {
@@ -86,6 +89,34 @@ const basePlayers = [
     hotspots: [[38, 46], [56, 38], [63, 58]]
   },
   {
+    name: "Connor McDavid",
+    sport: "NHL",
+    team: "EDM",
+    opponent: "VAN",
+    market: "Points",
+    line: 1.5,
+    recent: [2, 1, 3, 2, 0, 2, 1, 3, 2, 1],
+    usage: 33,
+    matchup: 8,
+    confidence: 73,
+    note: "Elite ice time and power-play role keep his point markets in range when pace is up.",
+    hotspots: [[42, 40], [54, 42], [60, 55]]
+  },
+  {
+    name: "Auston Matthews",
+    sport: "NHL",
+    team: "TOR",
+    opponent: "BOS",
+    market: "Shots On Goal",
+    line: 3.5,
+    recent: [5, 4, 3, 6, 4, 2, 5, 4, 6, 3],
+    usage: 31,
+    matchup: 7,
+    confidence: 70,
+    note: "Shot volume is driven by power-play touches, home matchup, and opponent shot suppression.",
+    hotspots: [[36, 45], [52, 38], [66, 52]]
+  },
+  {
     name: "Islam Makhachev",
     sport: "MMA",
     team: "Makhachev",
@@ -139,7 +170,7 @@ const insights = [
     type: "Market",
     sport: "MLB",
     title: "Betts total bases remains playable",
-    body: "The sample model grades his 1.5 total bases line as a small edge against a pitcher allowing elevated barrel contact.",
+    body: "The live-ready model grades his 1.5 total bases line as a small edge against a pitcher allowing elevated barrel contact.",
     player: "Mookie Betts",
     score: 76
   },
@@ -168,6 +199,14 @@ const insights = [
     score: 68
   },
   {
+    type: "Environment",
+    sport: "NHL",
+    title: "Indoor ice keeps weather out, but pace still matters",
+    body: "NHL player props lean more on rink pace, power-play role, opponent shot suppression, and goalie workload than outside weather.",
+    player: "Connor McDavid",
+    score: 77
+  },
+  {
     type: "Matchup",
     sport: "MMA",
     title: "Makhachev grappling path grades well",
@@ -186,11 +225,14 @@ const insights = [
 ];
 
 const quickPrompts = [
-  "Is Brunson over 27.5 points worth researching?",
-  "Build a 3 leg balanced parlay",
-  "Compare McCaffrey and Lamb for safest prop",
-  "What MLB insight has the strongest edge?",
-  "Which MMA prop has the best model score?"
+  { tag: "Prop edge", text: "Is Brunson over 27.5 points worth researching?" },
+  { tag: "Alt line", text: "Find a safer alternate line for McDavid shots." },
+  { tag: "Parlay", text: "Build a 3 leg balanced card with low correlation risk." },
+  { tag: "Sharp money", text: "Show me line movement and market edge signals." },
+  { tag: "Injuries", text: "What late injury or roster news changes projections?" },
+  { tag: "Matchup", text: "Compare McCaffrey and Lamb for safest prop." },
+  { tag: "MLB", text: "What MLB insight has the strongest edge?" },
+  { tag: "MMA", text: "Which MMA prop has the best model score?" }
 ];
 
 const titles = {
@@ -199,11 +241,27 @@ const titles = {
   players: "Player profiles",
   parlay: "Parlay builder",
   rankings: "Prop-centric rankings",
-  engine: "Live betting engine"
+  engine: "Live betting engine",
+  analytics: "Analytics dashboard"
 };
 
 let activeMode = "quick";
 let engineSnapshot = null;
+let manualParlayLegs = [];
+let livePlayerResults = [];
+let liveInsights = [];
+let analyticsSnapshot = null;
+let watchlist = loadJson(WATCHLIST_KEY, []);
+let marketSources = null;
+let dataFreshness = null;
+let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || "";
+let currentUser = null;
+let savedCards = [];
+let serverAlerts = [];
+let serverWatchlist = [];
+let responsibleUse = null;
+let lastParlayLegs = [];
+let activeTheme = localStorage.getItem(THEME_KEY) || "day";
 let catalog = {
   teams: {},
   markets: {},
@@ -212,6 +270,14 @@ let catalog = {
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+function loadJson(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function loadCustomPlayers() {
   try {
@@ -236,7 +302,7 @@ function makeRecent(line, confidence) {
 }
 
 function estimateConfidence(line, sport) {
-  const sportBase = { NFL: 70, MLB: 66, NBA: 69, MMA: 63 }[sport] || 66;
+  const sportBase = { NFL: 70, MLB: 66, NBA: 69, NHL: 67, MMA: 63 }[sport] || 66;
   const lineDrag = line > 50 ? 4 : line > 10 ? 2 : 0;
   return Math.max(58, Math.min(82, sportBase - lineDrag));
 }
@@ -284,12 +350,14 @@ async function loadCatalog() {
         NFL: ["Kansas City Chiefs", "Buffalo Bills", "Dallas Cowboys", "Philadelphia Eagles"],
         MLB: ["New York Yankees", "Los Angeles Dodgers", "Atlanta Braves", "Houston Astros"],
         NBA: ["Los Angeles Lakers", "Boston Celtics", "New York Knicks", "Dallas Mavericks"],
+        NHL: ["Boston Bruins", "Colorado Avalanche", "Edmonton Oilers", "New York Rangers", "Toronto Maple Leafs"],
         MMA: ["UFC", "Bellator", "PFL", "ONE Championship"]
       },
       markets: {
         NFL: ["Passing Yards", "Rushing Yards", "Receiving Yards", "Receptions", "Anytime Touchdown"],
         MLB: ["Hits", "Total Bases", "Home Runs", "Pitcher Strikeouts"],
         NBA: ["Points", "Rebounds", "Assists", "Threes"],
+        NHL: ["Shots On Goal", "Points", "Goals", "Assists", "Saves", "Puck Line"],
         MMA: ["Moneyline", "Significant Strikes", "Takedowns", "Fight Goes Distance"]
       },
       sample_players: basePlayers
@@ -329,12 +397,71 @@ function localPrediction(payload) {
     edge: Number(edge.toFixed(3)),
     confidence: Number((rate * (1 - Math.min(Math.abs(edge), 0.35))).toFixed(3)),
     recommendation,
+    source: "browser-fallback",
+    sample_size: 0,
+    validation: ["The backend prediction API was unavailable, so this browser fallback was used."],
     explanation: "Local browser model. Add ODDS_API_KEY in Render for live event and odds access."
   };
 }
 
 function oddsToProbability(odds) {
   return odds > 0 ? 100 / (odds + 100) : Math.abs(odds) / (Math.abs(odds) + 100);
+}
+
+function formatEventTime(value) {
+  if (!value) return "time pending";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function applyTheme(theme) {
+  activeTheme = theme === "night" ? "night" : "day";
+  document.documentElement.dataset.theme = activeTheme;
+  localStorage.setItem(THEME_KEY, activeTheme);
+  const button = $("#theme-toggle");
+  if (button) {
+    button.textContent = activeTheme === "night" ? "Day" : "Night";
+    button.title = activeTheme === "night" ? "Switch to day mode" : "Switch to night mode";
+  }
+}
+
+function toggleTheme() {
+  applyTheme(activeTheme === "night" ? "day" : "night");
+}
+
+async function postJson(path, body = {}) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || "Request failed");
+  return data;
+}
+
+async function loadCurrentUser() {
+  if (!authToken) {
+    currentUser = null;
+    return;
+  }
+  try {
+    const data = await fetch(`/api/me?token=${encodeURIComponent(authToken)}`, { cache: "no-store" }).then((response) => response.json());
+    currentUser = data.ok ? data.user : null;
+    if (!currentUser) {
+      authToken = "";
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+  } catch {
+    currentUser = null;
+  }
 }
 
 async function submitPrediction(event) {
@@ -364,8 +491,50 @@ async function submitPrediction(event) {
   renderPrediction(result);
 }
 
+async function getPrediction(payload) {
+  try {
+    const response = await fetch("/api/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("Prediction API unavailable");
+    return await response.json();
+  } catch {
+    return localPrediction(payload);
+  }
+}
+
 function renderPrediction(result) {
   const statusClass = result.recommendation === "Play" ? "play" : result.recommendation === "Fade" ? "fade" : "";
+  const resultSourceLabel = {
+    "sportsdataio-stats": "Live stats model",
+    "model-fallback": "Model fallback",
+    "browser-fallback": "Browser fallback"
+  }[result.source] || result.source || "Model";
+  const validation = Array.isArray(result.validation) && result.validation.length
+    ? `<div class="prediction-warnings">${result.validation.map((item) => `<div>${item}</div>`).join("")}</div>`
+    : "";
+  const factors = Array.isArray(result.factors) ? result.factors : [];
+  const marketIntel = result.market_intelligence || {};
+  const power = result.power_rating || {};
+  const risk = result.risk || {};
+  const environment = result.environment || {};
+  const matchup = result.matchup_intelligence || {};
+  const proLayers = result.pro_layers || {};
+  const edgeSystem = proLayers.edge_system || {};
+  const simulation = proLayers.simulation || {};
+  const lineMovement = proLayers.line_movement || {};
+  const altLines = Array.isArray(result.alternate_lines) ? result.alternate_lines : [];
+  const bestLines = Array.isArray(result.best_lines) && result.best_lines.length
+    ? `<div class="engine-list">${result.best_lines.slice(0, 3).map((event) => `
+        <div class="engine-item">
+          <strong>${event.away_team || ""} ${event.home_team ? `at ${event.home_team}` : ""}</strong>
+          <span class="muted">${formatEventTime(event.commence_time)}${event.venue ? ` - ${event.venue}` : ""}</span>
+          ${(event.best_lines || []).slice(0, 3).map((line) => `<span>${line.outcome} ${line.market}: ${line.best_price ?? ""} ${line.best_price_book ? `at ${line.best_price_book}` : ""}${line.best_line !== null && line.best_line !== undefined ? ` · line ${line.best_line}` : ""}</span>`).join("")}
+        </div>
+      `).join("")}</div>`
+    : "";
   $("#prediction-output").classList.add("active");
   $("#prediction-output").innerHTML = `
     <div class="prediction-result">
@@ -376,25 +545,128 @@ function renderPrediction(result) {
         </div>
         <span class="recommendation ${statusClass}">${result.recommendation}</span>
       </div>
+      <div class="metric-row">
+        <span class="pill">${resultSourceLabel}</span>
+        <span class="pill">${result.sample_size || 0} stat samples</span>
+        <span class="pill">${risk.tier || "Watch"}${risk.label ? ` - ${risk.label}` : ""}</span>
+        <span class="pill">power ${power.rating ?? "n/a"}</span>
+      </div>
       <div class="confidence">
         <strong>${Math.round(result.confidence * 100)}% confidence</strong>
         <div class="bar"><span style="width:${Math.round(result.confidence * 100)}%"></span></div>
       </div>
       <p>${result.explanation}</p>
+      <div class="market-grid">
+        <div class="market-box"><strong>Projected stat</strong><span>${result.projection}</span></div>
+        <div class="market-box"><strong>Fair odds</strong><span>${marketIntel.fair_odds ?? "n/a"}</span></div>
+        <div class="market-box"><strong>True probability</strong><span>${marketIntel.true_probability ? `${Math.round(marketIntel.true_probability * 100)}%` : "n/a"}</span></div>
+        <div class="market-box"><strong>Sharp signal</strong><span>${marketIntel.sharp_signal || "Waiting for market data"}</span></div>
+        <div class="market-box"><strong>EV</strong><span>${marketIntel.expected_value ?? edgeSystem.ev ?? "n/a"}</span></div>
+        <div class="market-box"><strong>Simulation</strong><span>${simulation.runs || 0} runs</span></div>
+        <div class="market-box"><strong>Environment</strong><span>${[environment.roof, environment.surface, environment.weather_risk].filter(Boolean).join(" / ") || "n/a"}</span></div>
+        <div class="market-box"><strong>Venue</strong><span>${environment.venue || "n/a"}</span></div>
+        <div class="market-box"><strong>Matchup</strong><span>${matchup.lean || "neutral"} (${matchup.score ?? "n/a"})</span></div>
+        <div class="market-box"><strong>CLV watch</strong><span>${marketIntel.clv_watch || "Track close vs entry"}</span></div>
+        <div class="market-box"><strong>Line movement</strong><span>${lineMovement.steam_move || "pending"} / ${lineMovement.reverse_line_movement || "pending"}</span></div>
+      </div>
+      ${proLayers.model_stack ? `<div class="factor-list"><div><strong>Model stack</strong><span>${proLayers.model_stack.join(" -> ")}</span></div><div><strong>Sport-specific edges</strong><span>${(proLayers.sport_specific || []).join(", ")}</span></div></div>` : ""}
+      ${(environment.notes || []).length ? `<div class="factor-list">${environment.notes.map((note) => `<div><strong>Playing environment</strong><span>${note}</span></div>`).join("")}</div>` : ""}
+      ${matchup.score ? `<div class="factor-list"><div><strong>Opponent and coaching layer</strong><span>${matchup.history_note} ${matchup.coaching_note} ${matchup.opponent_note}</span></div></div>` : ""}
+      ${altLines.length ? `<div class="alt-lines"><h3>Alternate lines</h3>${altLines.map((alt) => `<div><strong>${alt.line}</strong><span>${Math.round(alt.hit_rate * 100)}% hit</span><span>fair ${alt.fair_odds}</span><span>${alt.risk?.tier || "Watch"}</span></div>`).join("")}</div>` : ""}
+      ${factors.length ? `<div class="factor-list">${factors.map((factor) => `<div><strong>${factor.name}</strong><span>${factor.note}</span></div>`).join("")}</div>` : ""}
+      ${validation}
+      ${bestLines}
       <div class="metric-row">
         <span class="pill">projection ${result.projection}</span>
         <span class="pill">hit ${Math.round(result.hit_rate * 100)}%</span>
         <span class="pill">implied ${Math.round(result.implied_probability * 100)}%</span>
         <span class="pill">edge ${result.edge}</span>
+        <button class="mini-btn" type="button" id="watch-current">Watch this prop</button>
+        <button class="mini-btn" type="button" id="alert-current">Create alert</button>
       </div>
     </div>
   `;
+  $("#watch-current")?.addEventListener("click", () => addWatch(result));
+  $("#alert-current")?.addEventListener("click", () => createAlertFromResult(result));
+}
+
+function addWatch(result) {
+  const item = {
+    id: `${result.sport}-${result.subject}-${result.market}`.toLowerCase(),
+    subject: result.subject,
+    sport: result.sport,
+    market: result.market,
+    line: result.line,
+    odds: result.odds,
+    confidence: result.confidence,
+    createdAt: new Date().toISOString()
+  };
+  watchlist = [item, ...watchlist.filter((watch) => watch.id !== item.id)].slice(0, 20);
+  localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
+  fetch("/api/watchlist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: authToken || null, ...item, threshold: Number(result.confidence || 0) })
+  }).catch(() => {});
+  renderAnalytics();
+}
+
+async function createAlertFromResult(result) {
+  try {
+    await postJson("/api/alerts", {
+      token: authToken || null,
+      subject: result.subject,
+      sport: result.sport,
+      market: result.market,
+      threshold: Math.max(0.55, Number(result.confidence || 0.6))
+    });
+    await loadAnalytics();
+  } catch (error) {
+    alert(error.message || "Could not create that alert.");
+  }
+}
+
+async function submitStatsAsk(event) {
+  event.preventDefault();
+  const question = $("#ask-input").value.trim();
+  if (!question) return;
+  const output = $("#ask-output");
+  output.classList.add("active");
+  output.innerHTML = `<p class="muted">Checking live stats, odds, and context feeds...</p>`;
+  try {
+    const response = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, sport: $("#sport-filter").value })
+    });
+    if (!response.ok) throw new Error("stats ask failed");
+    const data = await response.json();
+    output.innerHTML = `
+      <div class="prediction-result">
+        <div class="prediction-head">
+          <div>
+            <h2>${data.subject || "Stats answer"}</h2>
+            <p class="muted">${data.sport || "All sports"} - ${data.source || "engine"}</p>
+          </div>
+          <span class="recommendation">${data.recommendation || "Research"}</span>
+        </div>
+        <p>${data.answer || data.explanation || "No answer was returned."}</p>
+        <div class="metric-row">
+          ${data.confidence ? `<span class="pill">${Math.round(data.confidence * 100)}% confidence</span>` : ""}
+          ${data.projection ? `<span class="pill">projection ${data.projection}</span>` : ""}
+          ${data.sample_size ? `<span class="pill">${data.sample_size} stat samples</span>` : ""}
+        </div>
+      </div>
+    `;
+  } catch {
+    output.innerHTML = `<div class="prediction-warnings"><div>The stats question engine is unavailable right now. Try the Prediction lab while the feed recovers.</div></div>`;
+  }
 }
 
 function renderChatIntro() {
   addMessage(
     "bot",
-    "Ask me about a prop, player, matchup, insight, or parlay. I'll answer from the local sample slate and show the stats I used."
+    "Ask me about a prop, player, matchup, injury note, line movement, alternate line, or parlay. I will use live providers first and label fallback logic."
   );
 }
 
@@ -420,8 +692,8 @@ function analyzeQuestion(question) {
     return `<strong>Comparison</strong>${sorted.map((player) => `${player.name}: ${player.confidence}% confidence, ${hitRate(player)}% recent hit rate, ${player.matchup}/10 matchup`).join("<br>")}<div class="metric-row"><span class="pill">Best floor: ${sorted[0].name}</span><span class="pill">${activeMode === "full" ? "Full mode includes volatility notes" : "Quick mode"}</span></div>`;
   }
 
-  if (lower.includes("mlb") || lower.includes("nba") || lower.includes("nfl") || lower.includes("mma") || lower.includes("insight")) {
-    const sport = lower.includes("mlb") ? "MLB" : lower.includes("nfl") ? "NFL" : lower.includes("nba") ? "NBA" : lower.includes("mma") ? "MMA" : $("#sport-filter").value;
+  if (lower.includes("mlb") || lower.includes("nba") || lower.includes("nfl") || lower.includes("nhl") || lower.includes("mma") || lower.includes("insight")) {
+    const sport = lower.includes("mlb") ? "MLB" : lower.includes("nfl") ? "NFL" : lower.includes("nba") ? "NBA" : lower.includes("nhl") ? "NHL" : lower.includes("mma") ? "MMA" : $("#sport-filter").value;
     const item = insights.filter((insight) => sport === "All" || insight.sport === sport).sort((a, b) => b.score - a.score)[0];
     return `<strong>${item.title}</strong>${item.body}<div class="metric-row"><span class="pill">${item.sport}</span><span class="pill">${item.type}</span><span class="pill">${item.score}/100 edge score</span></div>`;
   }
@@ -437,12 +709,17 @@ function analyzeQuestion(question) {
 
 function renderQuickPrompts() {
   $("#quick-prompts").innerHTML = quickPrompts
-    .map((prompt) => `<button class="prompt" type="button">${prompt}</button>`)
+    .map((prompt) => `
+      <button class="prompt" type="button" data-prompt="${prompt.text}">
+        <span>${prompt.tag}</span>
+        <strong>${prompt.text}</strong>
+      </button>
+    `)
     .join("");
 
   $$(".prompt").forEach((button) => {
     button.addEventListener("click", () => {
-      $("#chat-input").value = button.textContent;
+      $("#chat-input").value = button.dataset.prompt;
       $("#chat-form").requestSubmit();
     });
   });
@@ -460,7 +737,7 @@ function renderInsights() {
     player: player.name,
     score: player.confidence
   }));
-  const allInsights = [...insights, ...customInsights];
+  const allInsights = [...liveInsights, ...insights, ...customInsights];
   const rows = allInsights.filter((insight) => {
     const matchesSport = sport === "All" || insight.sport === sport;
     const matchesEdge = edge === "All" || insight.type === edge;
@@ -479,13 +756,47 @@ function renderInsights() {
       <div class="metric-row">
         <span class="pill">${insight.sport}</span>
         <span class="pill">${insight.player}</span>
+        ${insight.source ? `<span class="pill">${insight.source}</span>` : ""}
       </div>
     </article>
   `).join("") || `<p class="muted">No insights match those filters.</p>`;
 }
 
+async function loadLiveInsights() {
+  const sport = $("#sport-filter").value;
+  const query = $("#insight-search").value.trim();
+  try {
+    const response = await fetch(`/api/insights?sport=${encodeURIComponent(sport)}&q=${encodeURIComponent(query)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("insights unavailable");
+    const data = await response.json();
+    liveInsights = data.insights || [];
+  } catch {
+    liveInsights = [];
+  }
+  renderInsights();
+}
+
 function renderPlayers() {
-  $("#player-grid").innerHTML = filteredPlayers().map((player) => `
+  const localCards = filteredPlayers();
+  const liveCards = livePlayerResults.map((player) => ({
+    name: player.name,
+    sport: $("#custom-sport").value,
+    team: player.team || "FA",
+    opponent: "Live profile",
+    market: player.position || "Profile",
+    line: 0,
+    recent: [0],
+    usage: 0,
+    matchup: 0,
+    confidence: player.status ? 72 : 66,
+    note: `${player.position || "Player"} · ${player.status || "No current status note"}`,
+    hotspots: [[42, 48], [58, 52], [50, 66]],
+    source: player.source || "sportsdataio",
+    live: true
+  }));
+  const cards = [...liveCards, ...localCards];
+
+  $("#player-grid").innerHTML = cards.map((player) => `
     <article class="player-card">
       <div class="player-head">
         <div class="avatar">${player.name.split(" ").map((part) => part[0]).join("")}</div>
@@ -497,11 +808,12 @@ function renderPlayers() {
       <div class="bars">
         <span>Confidence ${player.confidence}%</span>
         <div class="bar"><span style="width:${player.confidence}%"></span></div>
-        <span>Recent hit rate ${hitRate(player)}%</span>
-        <div class="bar"><span style="width:${hitRate(player)}%"></span></div>
+        <span>${player.live ? "Live profile source" : `Recent hit rate ${hitRate(player)}%`}</span>
+        <div class="bar"><span style="width:${player.live ? 80 : hitRate(player)}%"></span></div>
       </div>
       <div class="metric-row">
         <button class="prompt open-player" data-player="${player.name}">Open profile</button>
+        ${player.live ? `<span class="pill">Live profile</span>` : ""}
         ${player.custom ? `<button class="remove-player" data-player="${player.name}">Remove</button>` : ""}
       </div>
     </article>
@@ -511,26 +823,42 @@ function renderPlayers() {
   $$(".remove-player").forEach((button) => button.addEventListener("click", () => removeCustomPlayer(button.dataset.player)));
 }
 
-function openPlayer(name) {
-  const player = players.find((item) => item.name === name);
+async function openPlayer(name) {
+  const player = players.find((item) => item.name === name) || livePlayerResults.find((item) => item.name === name);
+  const sport = player.sport || $("#custom-sport").value;
+  let context = null;
+  try {
+    const response = await fetch(`/api/context/${sport}?q=${encodeURIComponent(name)}`);
+    if (response.ok) context = await response.json();
+  } catch {
+    context = null;
+  }
+  const contextHtml = context ? `
+    <h2>News and injury wire</h2>
+    <div class="engine-list">
+      ${(context.injuries || []).slice(0, 4).map((item) => `<div class="engine-item"><strong>${item.player || name}</strong>${[item.team, item.status, item.body_part].filter(Boolean).join(" · ")}</div>`).join("")}
+      ${(context.news || []).slice(0, 4).map((item) => `<div class="engine-item"><strong>${item.title || "News"}</strong><span class="muted">${item.summary || ""}</span></div>`).join("")}
+    </div>
+  ` : "";
   $("#dialog-content").innerHTML = `
     <div class="profile">
       <div>
         <div class="avatar">${player.name.split(" ").map((part) => part[0]).join("")}</div>
         <h2>${player.name}</h2>
         <p class="muted">${player.team} vs ${player.opponent}</p>
-        <p>${player.note}</p>
+        <p>${player.note || "Live player profile."}</p>
         <div class="metric-row">
           <span class="pill">${player.market} ${player.line}</span>
-          <span class="pill">${hitRate(player)}% hit rate</span>
+          ${player.live ? `<span class="pill">SportsDataIO profile</span>` : `<span class="pill">${hitRate(player)}% hit rate</span>`}
           <span class="pill">${player.confidence}% confidence</span>
         </div>
       </div>
       <div>
         <h2>Usage map</h2>
         <div class="shot-map">
-          ${player.hotspots.map(([x, y]) => `<span class="hotspot" style="left:${x}%; top:${y}%"></span>`).join("")}
+          ${(player.hotspots || [[42, 48], [58, 52], [50, 66]]).map(([x, y]) => `<span class="hotspot" style="left:${x}%; top:${y}%"></span>`).join("")}
         </div>
+        ${contextHtml}
       </div>
     </div>
   `;
@@ -555,50 +883,169 @@ function buildParlay(legs, risk, sport) {
   return { pool, combined };
 }
 
+function sourceLabel(source) {
+  return {
+    "sportsdataio-stats": "Live stats",
+    "model-fallback": "Model fallback",
+    "browser-fallback": "Browser fallback",
+    "baseline-slate": "Baseline slate"
+  }[source] || source || "Fallback";
+}
+
+function renderManualParlayLegs() {
+  $("#manual-parlay-legs").innerHTML = manualParlayLegs.map((leg, index) => `
+    <div class="manual-leg">
+      <strong>${index + 1}. ${leg.player || leg.team} ${leg.market} ${leg.line}</strong>
+      <div class="metric-row">
+        <span class="pill">${leg.sport}</span>
+        <span class="pill">odds ${leg.odds}</span>
+        <button class="remove-player remove-parlay-leg" data-index="${index}" type="button">Remove</button>
+      </div>
+    </div>
+  `).join("");
+
+  $$(".remove-parlay-leg").forEach((button) => {
+    button.addEventListener("click", () => {
+      manualParlayLegs.splice(Number(button.dataset.index), 1);
+      renderManualParlayLegs();
+    });
+  });
+}
+
+function addManualParlayLeg() {
+  const sport = $("#focus-input").value === "All" ? $("#sport-filter").value : $("#focus-input").value;
+  const subject = $("#parlay-subject").value.trim();
+  const market = $("#parlay-market").value.trim();
+  const line = Number($("#parlay-line").value);
+  const odds = Number($("#parlay-odds").value || -110);
+  if (!subject || !market || !Number.isFinite(line)) return;
+
+  manualParlayLegs.push({
+    sport: sport === "All" ? "NFL" : sport,
+    player: subject,
+    team: "",
+    market,
+    line,
+    odds
+  });
+
+  $("#parlay-subject").value = "";
+  $("#parlay-market").value = "";
+  $("#parlay-line").value = "";
+  $("#parlay-odds").value = "";
+  renderManualParlayLegs();
+}
+
 function formatParlayAnswer(card) {
   return `<strong>Generated ${card.pool.length}-leg research card</strong>${card.pool.map((player) => `${player.name} ${player.market} over ${player.line}: ${player.confidence}% confidence`).join("<br>")}<div class="metric-row"><span class="pill">Combined confidence ${card.combined}%</span><span class="pill">Check live lines before acting</span></div>`;
 }
 
-function renderParlay() {
+async function renderParlay() {
   const legs = Number($("#legs-input").value);
   const risk = $("#risk-input").value;
   const focus = $("#focus-input").value;
-  const card = buildParlay(legs, risk, focus);
+  const manualPredictions = [];
+  for (const leg of manualParlayLegs) {
+    manualPredictions.push(await getPrediction(leg));
+  }
+
+  const remaining = Math.max(0, legs - manualPredictions.length);
+  const card = buildParlay(remaining || legs, risk, focus);
+  const samplePredictions = manualPredictions.length >= legs ? [] : card.pool.slice(0, remaining).map((player) => ({
+    subject: player.name,
+    sport: player.sport,
+    team: player.team,
+    market: player.market,
+    line: player.line,
+    odds: -110,
+    confidence: player.confidence / 100,
+    hit_rate: hitRate(player) / 100,
+    edge: Number((hitRate(player) / 100 - oddsToProbability(-110)).toFixed(3)),
+    recommendation: "Watch",
+    source: "baseline-slate",
+    sample_size: player.recent.length,
+    explanation: player.note
+  }));
+  const allLegs = [...manualPredictions, ...samplePredictions].slice(0, legs);
+  lastParlayLegs = allLegs;
+  const combined = allLegs.length
+    ? Math.round((allLegs.reduce((sum, leg) => sum + Number(leg.confidence || 0), 0) / allLegs.length) * 100)
+    : 0;
+
   $("#parlay-output").innerHTML = `
     <h2>Generated card</h2>
     <div class="confidence">
-      <strong>${card.combined}%</strong>
-      <div class="bar"><span style="width:${card.combined}%"></span></div>
+      <strong>${combined}%</strong>
+      <div class="bar"><span style="width:${combined}%"></span></div>
     </div>
-    ${card.pool.map((player, index) => `
+    ${allLegs.map((leg, index) => `
       <div class="leg">
-        <strong>${index + 1}. ${player.name} over ${player.line} ${player.market}</strong>
-        <span class="muted">${player.note}</span>
+        <strong>${index + 1}. ${leg.subject} over ${leg.line} ${leg.market}</strong>
+        <span class="muted">${leg.explanation}</span>
         <div class="metric-row">
-          <span class="pill">${player.sport}</span>
-          <span class="pill">${hitRate(player)}% last-ten</span>
-          <span class="pill">${player.matchup}/10 matchup</span>
+          <span class="pill">${leg.sport}</span>
+          <span class="pill">${sourceLabel(leg.source)}</span>
+          <span class="pill">${Math.round(Number(leg.hit_rate || 0) * 100)}% hit</span>
+          <span class="pill">edge ${leg.edge}</span>
         </div>
+        ${Array.isArray(leg.validation) && leg.validation.length ? `<div class="prediction-warnings">${leg.validation.map((item) => `<div>${item}</div>`).join("")}</div>` : ""}
       </div>
     `).join("")}
+    <button class="mini-btn full-width" type="button" id="save-parlay-card">Save card</button>
   `;
+  $("#save-parlay-card")?.addEventListener("click", saveParlayCard);
 }
 
-function renderRankings() {
-  const rows = filteredPlayers().sort((a, b) => b.confidence - a.confidence);
+async function saveParlayCard() {
+  if (!lastParlayLegs.length) return;
+  try {
+    await postJson("/api/cards", {
+      token: authToken || null,
+      name: `${lastParlayLegs.length}-leg card ${new Date().toLocaleDateString()}`,
+      legs: lastParlayLegs
+    });
+    await loadAnalytics();
+  } catch (error) {
+    alert(error.message || "Could not save this card.");
+  }
+}
+
+async function renderRankings() {
+  const sport = $("#sport-filter").value;
+  const team = $("#team-filter").value;
+  let rows = [];
+  let source = "browser fallback";
+  try {
+    const response = await fetch(`/api/rankings?sport=${encodeURIComponent(sport)}&team=${encodeURIComponent(team)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("rankings unavailable");
+    const data = await response.json();
+    rows = data.rankings || [];
+    source = data.source || "live rankings";
+  } catch {
+    rows = filteredPlayers().sort((a, b) => b.confidence - a.confidence).map((player) => ({
+      player: player.name,
+      subject: player.name,
+      sport: player.sport,
+      team: `${player.team} vs ${player.opponent}`,
+      market: `${player.market} ${player.line}`,
+      confidence: player.confidence,
+      best_book: "fallback",
+      source: "browser-fallback"
+    }));
+  }
   $("#ranking-table").innerHTML = `
     <div class="rank-row header">
       <span>Rank</span><span>Player</span><span>Sport</span><span>Market</span><span>Confidence</span>
     </div>
-    ${rows.map((player, index) => `
+    ${rows.map((row, index) => `
       <div class="rank-row">
         <span>#${index + 1}</span>
-        <span><strong>${player.name}</strong><br><span class="muted">${player.team} vs ${player.opponent}</span></span>
-        <span>${player.sport}</span>
-        <span>${player.market} ${player.line}</span>
-        <span>${player.confidence}%</span>
+        <span><strong>${row.player || row.subject || row.name}</strong><br><span class="muted">${row.team || row.matchup || row.event || source}</span></span>
+        <span>${row.sport}</span>
+        <span>${row.market}${row.line !== null && row.line !== undefined ? ` ${row.line}` : ""}${row.book || row.best_book ? `<br><span class="muted">${row.book || row.best_book}</span>` : ""}${row.commence_time ? `<br><span class="muted">${formatEventTime(row.commence_time)}</span>` : ""}${row.venue ? `<br><span class="muted">${row.venue}</span>` : ""}</span>
+        <span>${Math.round(row.confidence || 0)}%</span>
       </div>
-    `).join("")}
+    `).join("") || `<div class="rank-row"><span></span><span>No live rankings yet.</span><span></span><span></span><span></span></div>`}
   `;
 }
 
@@ -622,7 +1069,7 @@ function localEngineSnapshot() {
   const usageTotal = firstShotPool.reduce((sum, player) => sum + player.usage, 0) || 1;
 
   return {
-    mode: "local sample",
+    mode: "local baseline",
     top_bets: allBets.filter((bet) => bet.confidence > 0.55 && bet.edge > 0.05).slice(0, 10),
     all_bets: allBets,
     parlay: allBets.filter((bet) => bet.edge > 0.06).slice(0, 3),
@@ -649,6 +1096,15 @@ async function loadEngineSnapshot() {
 function renderEngine() {
   const snapshot = engineSnapshot || localEngineSnapshot();
   const topBets = snapshot.top_bets?.length ? snapshot.top_bets : snapshot.all_bets?.slice(0, 5) || [];
+  const events = snapshot.events || [];
+  const providers = snapshot.providers || {};
+  const liveSports = providers.live_odds_sports || [];
+  const providerSummary = [
+    providers.odds_api_connected ? "Odds key connected" : "Odds key missing",
+    providers.sportsdata_api_connected ? "Stats key connected" : "Stats key missing",
+    liveSports.length ? `Live odds: ${liveSports.join(", ")}` : "No live odds feed in this view"
+  ];
+  $("#engine-status").textContent = snapshot.mode || "Model engine";
 
   $("#top-bets").innerHTML = topBets.map((bet) => `
     <div class="engine-item">
@@ -675,9 +1131,249 @@ function renderEngine() {
     </div>
   `).join("") || `<p class="muted">First-shot history is not loaded.</p>`;
 
-  $("#engine-insights").innerHTML = (snapshot.insights || []).map((insight) => `
+  $("#engine-insights").innerHTML = `
+    ${events.length ? `<div class="engine-item"><strong>Upcoming games and locations</strong>${events.slice(0, 8).map((event) => `<span>${event.matchup || `${event.away_team} at ${event.home_team}`} - ${formatEventTime(event.commence_time)} - ${event.venue || "venue pending"}</span>`).join("")}</div>` : ""}
+    ${providerSummary.map((item) => `<div class="engine-item"><strong>${item}</strong></div>`).join("")}
+    ${(snapshot.insights || []).map((insight) => `
     <div class="engine-item">${insight}</div>
-  `).join("") || `<p class="muted">No engine insights yet.</p>`;
+  `).join("")}
+  ` || `<p class="muted">No engine insights yet.</p>`;
+}
+
+async function loadAnalytics() {
+  try {
+    const token = encodeURIComponent(authToken || "");
+    const [analyticsResponse, statusResponse, cardsResponse, alertsResponse, watchResponse, responsibleResponse] = await Promise.all([
+      fetch("/api/analytics", { cache: "no-store" }),
+      fetch("/api/admin/status", { cache: "no-store" }),
+      fetch(`/api/cards?token=${token}`, { cache: "no-store" }),
+      fetch(`/api/alerts?token=${token}`, { cache: "no-store" }),
+      fetch(`/api/watchlist?token=${token}`, { cache: "no-store" }),
+      fetch("/api/responsible-use", { cache: "no-store" })
+    ]);
+    analyticsSnapshot = {
+      analytics: analyticsResponse.ok ? await analyticsResponse.json() : null,
+      status: statusResponse.ok ? await statusResponse.json() : null
+    };
+    savedCards = cardsResponse.ok ? (await cardsResponse.json()).cards || [] : [];
+    serverAlerts = alertsResponse.ok ? (await alertsResponse.json()).alerts || [] : [];
+    serverWatchlist = watchResponse.ok ? (await watchResponse.json()).watchlist || [] : [];
+    responsibleUse = responsibleResponse.ok ? await responsibleResponse.json() : null;
+  } catch {
+    analyticsSnapshot = null;
+  }
+  renderAnalytics();
+}
+
+async function loadMarketSources() {
+  try {
+    const [response, freshnessResponse] = await Promise.all([
+      fetch("/api/market-sources", { cache: "no-store" }),
+      fetch("/api/data-freshness", { cache: "no-store" })
+    ]);
+    if (!response.ok) throw new Error("market source framework unavailable");
+    marketSources = await response.json();
+    dataFreshness = freshnessResponse.ok ? await freshnessResponse.json() : null;
+  } catch {
+    marketSources = null;
+    dataFreshness = null;
+  }
+  renderAnalytics();
+}
+
+function renderObjectList(object) {
+  return Object.entries(object || {}).map(([key, value]) => `<div class="engine-item"><strong>${key}</strong>${typeof value === "object" ? Object.entries(value).map(([inner, flag]) => `${inner}: ${Array.isArray(flag) ? flag.join(", ") : flag}`).join(" | ") : value}</div>`).join("");
+}
+
+function renderAnalytics() {
+  const analytics = analyticsSnapshot?.analytics;
+  const status = analyticsSnapshot?.status;
+  const database = status?.database || {};
+  const clvCount = analytics?.clv_tracked || 0;
+  const avgClv = analytics?.average_clv ?? 0;
+  $("#analytics-summary").innerHTML = analytics ? `
+    <div class="engine-item"><strong>Total predictions</strong>${analytics.total_predictions}</div>
+    <div class="engine-item"><strong>Tracked hit rate</strong>${Math.round((analytics.hit_rate || 0) * 100)}% (${analytics.wins || 0}-${analytics.losses || 0}-${analytics.pushes || 0})</div>
+    <div class="engine-item"><strong>CLV tracked</strong>${clvCount} entries | avg ${avgClv}</div>
+    ${renderObjectList(analytics.by_source)}
+    ${renderObjectList(analytics.by_recommendation)}
+  ` : `<p class="muted">Analytics are waiting for predictions.</p>`;
+
+  $("#provider-health").innerHTML = status ? `
+    <div class="engine-item"><strong>Engine mode</strong>${status.engine_mode || "warming up"}</div>
+    <div class="engine-item"><strong>Cache entries</strong>${status.cache_entries}</div>
+    <div class="engine-item"><strong>Database</strong>${database.ready ? "ready" : "not ready"} | ${database.type || "sqlite"}${database.persistent_on_render ? " | persistent" : " | add Render Postgres for persistence"}</div>
+    <div class="engine-item"><strong>Weather provider</strong>${status.weather_api_connected ? "connected" : "modeled fallback"}</div>
+    ${renderObjectList(status.providers)}
+  ` : `<p class="muted">Provider health is unavailable.</p>`;
+
+  $("#prediction-history").innerHTML = (analytics?.recent || []).slice().reverse().map((row) => `
+    <div class="engine-item">
+      <strong>${row.subject} - ${row.market}</strong>
+      <div class="metric-row">
+        <span class="pill">${row.sport}</span>
+        <span class="pill">${row.recommendation}</span>
+        <span class="pill">${row.source}</span>
+        <span class="pill">${Math.round((row.confidence || 0) * 100)}%</span>
+        <span class="pill">${row.outcome || "pending"}</span>
+        ${row.clv !== null && row.clv !== undefined ? `<span class="pill">CLV ${row.clv}</span>` : ""}
+        ${row.id ? `<button class="mini-btn grade-btn" type="button" data-id="${row.id}" data-outcome="win">Win</button><button class="mini-btn grade-btn" type="button" data-id="${row.id}" data-outcome="loss">Loss</button><button class="mini-btn grade-btn" type="button" data-id="${row.id}" data-outcome="push">Push</button>` : ""}
+      </div>
+      ${row.id ? `<div class="metric-row"><input class="mini-input clv-line" data-id="${row.id}" inputmode="decimal" placeholder="Closing line"><input class="mini-input clv-odds" data-id="${row.id}" inputmode="numeric" placeholder="Closing odds"><button class="mini-btn clv-btn" type="button" data-id="${row.id}">Save CLV</button></div>` : ""}
+    </div>
+  `).join("") || `<p class="muted">No predictions have been logged yet.</p>`;
+
+  $("#accuracy-report").innerHTML = analytics ? `
+    <div class="engine-item"><strong>Settled</strong>${analytics.settled_predictions || 0}</div>
+    <div class="engine-item"><strong>Confidence tiers</strong>${renderInlineMap(analytics.by_confidence)}</div>
+    <div class="engine-item"><strong>By sport</strong>${renderInlineMap(analytics.by_sport)}</div>
+  ` : `<p class="muted">Grade predictions to unlock accuracy tracking.</p>`;
+
+  $("#owner-controls").innerHTML = `
+    <div class="engine-item">
+      <strong>Account</strong>
+      ${currentUser ? `<span>Signed in as ${currentUser.username}</span><button class="mini-btn" type="button" id="auth-logout">Log out</button>` : `
+        <input class="mini-input" id="auth-username" autocomplete="username" placeholder="Username">
+        <input class="mini-input" id="auth-password" autocomplete="current-password" type="password" placeholder="Password">
+        <div class="metric-row"><button class="mini-btn" type="button" id="auth-login">Log in</button><button class="mini-btn" type="button" id="auth-register">Register</button></div>
+      `}
+    </div>
+    <div class="engine-item"><strong>Watchlist</strong>${serverWatchlist.length || watchlist.length} server/local watches</div>
+    ${[...serverWatchlist, ...watchlist].slice(0, 5).map((item) => `<div class="engine-item"><strong>${item.subject}</strong>${item.sport} - ${item.market} ${item.line || ""}</div>`).join("")}
+    <div class="engine-item">
+      <strong>Alerts</strong>
+      <input class="mini-input" id="alert-subject" placeholder="Player/team">
+      <div class="inline-grid">
+        <select class="mini-input" id="alert-sport"><option>NFL</option><option>MLB</option><option>NBA</option><option>NHL</option><option>MMA</option></select>
+        <input class="mini-input" id="alert-market" placeholder="Market">
+        <input class="mini-input" id="alert-threshold" inputmode="decimal" placeholder="0.60">
+      </div>
+      <div class="metric-row"><button class="mini-btn" type="button" id="create-alert">Create alert</button><button class="mini-btn" type="button" id="check-alerts">Check alerts</button></div>
+    </div>
+    ${serverAlerts.slice(0, 4).map((item) => `<div class="engine-item"><strong>${item.subject}</strong>${item.sport} - ${item.market}<span class="muted">${item.last_message || "watching"}</span></div>`).join("")}
+    <div class="engine-item"><strong>Saved cards</strong>${savedCards.length} saved</div>
+    ${savedCards.slice(0, 3).map((card) => `<div class="engine-item"><strong>${card.name}</strong>${(card.legs || []).length} legs</div>`).join("")}
+    <div class="engine-item"><strong>24-hour refresh</strong>${dataFreshness?.daily_refresh?.status || "waiting"}${dataFreshness?.daily_refresh?.timestamp ? ` - ${new Date(dataFreshness.daily_refresh.timestamp * 1000).toLocaleString()}` : ""}</div>
+    <div class="engine-item"><strong>Manual refresh</strong><button class="mini-btn" type="button" id="force-refresh">Refresh feeds now</button></div>
+    <div class="engine-item"><strong>Settlement</strong><button class="mini-btn" type="button" id="run-settlement">Check pending results</button></div>
+    <div class="engine-item"><strong>Market framework</strong>${(marketSources?.framework || []).slice(0, 4).join(" | ") || "Loading source stack..."}</div>
+    ${(marketSources?.sources || []).slice(0, 4).map((source) => `<div class="engine-item"><strong>${source.name}</strong>${source.role}: ${source.use}</div>`).join("")}
+    <div class="engine-item"><strong>Responsible use</strong>${(responsibleUse?.rules || []).slice(0, 2).join(" ") || "Research only. Predictions are not guarantees."}</div>
+    <div class="engine-item"><strong>Gambling help</strong>${responsibleUse?.helpline ? `Call ${responsibleUse.helpline.call}, text ${responsibleUse.helpline.text}, or use NCPG chat.` : "If gambling is causing problems, seek free confidential help through the National Council on Problem Gambling."}</div>
+  `;
+  $("#force-refresh")?.addEventListener("click", forceRefreshFeeds);
+  $("#auth-login")?.addEventListener("click", () => submitAuth("login"));
+  $("#auth-register")?.addEventListener("click", () => submitAuth("register"));
+  $("#auth-logout")?.addEventListener("click", logoutUser);
+  $("#create-alert")?.addEventListener("click", createManualAlert);
+  $("#check-alerts")?.addEventListener("click", checkAlerts);
+  $("#run-settlement")?.addEventListener("click", runSettlement);
+  $$(".grade-btn").forEach((button) => button.addEventListener("click", () => gradePrediction(button.dataset.id, button.dataset.outcome)));
+  $$(".clv-btn").forEach((button) => button.addEventListener("click", () => updateClosingLine(button.dataset.id)));
+}
+
+function renderInlineMap(object) {
+  return Object.entries(object || {}).map(([key, value]) => `${key}: ${value}`).join(" | ") || "none";
+}
+
+async function gradePrediction(id, outcome) {
+  try {
+    const response = await fetch(`/api/predictions/${encodeURIComponent(id)}/grade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outcome })
+    });
+    if (!response.ok) throw new Error("grade failed");
+    await loadAnalytics();
+  } catch {
+    alert("Could not grade that prediction. Render may have restarted and cleared in-memory history.");
+  }
+}
+
+async function updateClosingLine(id) {
+  const line = $(`.clv-line[data-id="${id}"]`)?.value;
+  const odds = $(`.clv-odds[data-id="${id}"]`)?.value || "-110";
+  if (!line) return;
+  try {
+    const response = await fetch(`/api/predictions/${encodeURIComponent(id)}/closing-line?closing_line=${encodeURIComponent(line)}&closing_odds=${encodeURIComponent(odds)}`, { method: "POST" });
+    if (!response.ok) throw new Error("clv failed");
+    await loadAnalytics();
+  } catch {
+    alert("Could not save that closing line.");
+  }
+}
+
+async function submitAuth(action) {
+  const username = $("#auth-username")?.value.trim();
+  const password = $("#auth-password")?.value;
+  if (!username || !password) return;
+  try {
+    const data = await postJson(`/api/auth/${action}`, { username, password });
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+    await loadAnalytics();
+  } catch (error) {
+    alert(error.message || "Account request failed.");
+  }
+}
+
+function logoutUser() {
+  authToken = "";
+  currentUser = null;
+  savedCards = [];
+  serverAlerts = [];
+  serverWatchlist = [];
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  renderAnalytics();
+}
+
+async function createManualAlert() {
+  const subject = $("#alert-subject")?.value.trim();
+  const market = $("#alert-market")?.value.trim();
+  if (!subject || !market) return;
+  try {
+    await postJson("/api/alerts", {
+      token: authToken || null,
+      subject,
+      sport: $("#alert-sport").value,
+      market,
+      threshold: Number($("#alert-threshold").value || 0.6)
+    });
+    await loadAnalytics();
+  } catch (error) {
+    alert(error.message || "Could not create alert.");
+  }
+}
+
+async function checkAlerts() {
+  try {
+    const data = await postJson("/api/alerts/check");
+    await loadAnalytics();
+    if (data.triggered?.length) alert(`${data.triggered.length} alert(s) triggered.`);
+  } catch {
+    alert("Could not check alerts right now.");
+  }
+}
+
+async function runSettlement() {
+  try {
+    const data = await postJson("/api/settlement/run");
+    await loadAnalytics();
+    alert(data.note || `Checked ${data.checked || 0} pending predictions.`);
+  } catch {
+    alert("Could not run settlement right now.");
+  }
+}
+
+async function forceRefreshFeeds() {
+  try {
+    const response = await fetch("/api/admin/refresh", { method: "POST" });
+    if (!response.ok) throw new Error("refresh failed");
+    await Promise.all([loadEngineSnapshot(), loadLiveInsights(), loadAnalytics(), loadMarketSources()]);
+  } catch {
+    alert("Could not force-refresh feeds right now.");
+  }
 }
 
 function switchView(view) {
@@ -693,6 +1389,7 @@ function refreshAll() {
   renderParlay();
   renderRankings();
   renderEngine();
+  renderAnalytics();
 }
 
 function addCustomPlayer(event) {
@@ -731,6 +1428,25 @@ function removeCustomPlayer(name) {
   refreshAll();
 }
 
+async function searchLivePlayers() {
+  const name = $("#custom-name").value.trim();
+  const sport = $("#custom-sport").value;
+  if (!name) {
+    livePlayerResults = [];
+    renderPlayers();
+    return;
+  }
+  try {
+    const response = await fetch(`/api/players/${sport}?q=${encodeURIComponent(name)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("player search failed");
+    const data = await response.json();
+    livePlayerResults = (data.players || []).map((player) => ({ ...player, sport, source: data.source }));
+  } catch {
+    livePlayerResults = [];
+  }
+  renderPlayers();
+}
+
 $$(".nav-item").forEach((item) => item.addEventListener("click", () => switchView(item.dataset.view)));
 $$(".mode").forEach((button) => button.addEventListener("click", () => {
   activeMode = button.dataset.mode;
@@ -746,14 +1462,25 @@ $("#chat-form").addEventListener("submit", (event) => {
   setTimeout(() => addMessage("bot", analyzeQuestion(question)), 220);
 });
 
+$("#ask-form").addEventListener("submit", submitStatsAsk);
 $("#sport-filter").addEventListener("change", refreshAll);
 $("#team-filter").addEventListener("change", refreshAll);
 $("#predict-sport").addEventListener("change", renderPredictionSuggestions);
 $("#edge-filter").addEventListener("change", renderInsights);
-$("#insight-search").addEventListener("input", renderInsights);
+$("#insight-search").addEventListener("input", () => {
+  clearTimeout(window.__insightSearchTimer);
+  window.__insightSearchTimer = setTimeout(loadLiveInsights, 350);
+});
 $("#build-parlay").addEventListener("click", renderParlay);
+$("#add-parlay-leg").addEventListener("click", addManualParlayLeg);
 $("#custom-player-form").addEventListener("submit", addCustomPlayer);
+$("#custom-name").addEventListener("input", () => {
+  clearTimeout(window.__playerSearchTimer);
+  window.__playerSearchTimer = setTimeout(searchLivePlayers, 350);
+});
+$("#custom-sport").addEventListener("change", searchLivePlayers);
 $("#prediction-form").addEventListener("submit", submitPrediction);
+$("#theme-toggle")?.addEventListener("click", toggleTheme);
 $("#refresh-btn").addEventListener("click", () => {
   players.forEach((player) => {
     player.confidence = Math.max(58, Math.min(91, player.confidence + Math.round(Math.random() * 6 - 3)));
@@ -763,9 +1490,18 @@ $("#refresh-btn").addEventListener("click", () => {
 });
 $("#close-dialog").addEventListener("click", () => $("#player-dialog").close());
 
+applyTheme(activeTheme);
 renderQuickPrompts();
 renderChatIntro();
 refreshAll();
-loadCatalog();
-loadEngineSnapshot();
-setInterval(loadEngineSnapshot, 15000);
+loadCurrentUser().finally(() => {
+  loadCatalog();
+  loadLiveInsights();
+  loadEngineSnapshot();
+  loadAnalytics();
+  loadMarketSources();
+});
+setInterval(loadEngineSnapshot, 60000);
+setInterval(loadLiveInsights, 60000);
+setInterval(loadAnalytics, 60000);
+setInterval(loadMarketSources, 300000);

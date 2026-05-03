@@ -239,6 +239,7 @@ const titles = {
   research: "Ask a sports research question",
   insights: "Curated daily edges",
   players: "Player profiles",
+  profile: "Your profile and tracked research",
   parlay: "Parlay builder",
   rankings: "Prop-centric rankings",
   engine: "Live betting engine",
@@ -250,6 +251,7 @@ let engineSnapshot = null;
 let manualParlayLegs = [];
 let livePlayerResults = [];
 let liveInsights = [];
+let liveRankings = [];
 let analyticsSnapshot = null;
 let watchlist = loadJson(WATCHLIST_KEY, []);
 let marketSources = null;
@@ -292,6 +294,66 @@ function saveCustomPlayers() {
   players = [...basePlayers, ...customPlayers];
 }
 
+function activeSport() {
+  return $("#sport-filter").value;
+}
+
+function compactTeamName(team) {
+  if (!team) return "";
+  const map = {
+    "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
+    "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE",
+    "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB",
+    "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX", "Kansas City Chiefs": "KC",
+    "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LAR", "Miami Dolphins": "MIA",
+    "Minnesota Vikings": "MIN", "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG",
+    "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT", "San Francisco 49ers": "SF",
+    "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB", "Tennessee Titans": "TEN", "Washington Commanders": "WAS",
+    "Boston Celtics": "BOS", "Brooklyn Nets": "BKN", "New York Knicks": "NYK", "Philadelphia 76ers": "PHI",
+    "Toronto Raptors": "TOR", "Chicago Bulls": "CHI", "Cleveland Cavaliers": "CLE", "Detroit Pistons": "DET",
+    "Indiana Pacers": "IND", "Milwaukee Bucks": "MIL", "Atlanta Hawks": "ATL", "Charlotte Hornets": "CHA",
+    "Miami Heat": "MIA", "Orlando Magic": "ORL", "Washington Wizards": "WAS", "Dallas Mavericks": "DAL",
+    "Houston Rockets": "HOU", "Memphis Grizzlies": "MEM", "New Orleans Pelicans": "NO", "San Antonio Spurs": "SA",
+    "Denver Nuggets": "DEN", "Minnesota Timberwolves": "MIN", "Oklahoma City Thunder": "OKC", "Portland Trail Blazers": "POR",
+    "Utah Jazz": "UTA", "Golden State Warriors": "GSW", "LA Clippers": "LAC", "Los Angeles Lakers": "LAL",
+    "Phoenix Suns": "PHX", "Sacramento Kings": "SAC"
+  };
+  return map[team] || team;
+}
+
+function initials(value) {
+  return (value || "EL").replace(/[^a-z0-9 ]/gi, " ").split(/\s+/).filter(Boolean).slice(0, 3).map((part) => part[0]).join("").toUpperCase() || "EL";
+}
+
+function teamLogo(team, sport = "") {
+  const label = compactTeamName(team);
+  return `<span class="team-logo ${sport.toLowerCase()}">${initials(label || team)}</span>`;
+}
+
+function trendFor(values = [], line = 0) {
+  if (!values.length) return { label: "trend pending", value: 50, tone: "watch" };
+  const first = avg(values.slice(0, Math.ceil(values.length / 2)));
+  const second = avg(values.slice(Math.floor(values.length / 2)));
+  const hit = values.filter((item) => item > line).length / values.length;
+  if (second > first * 1.08 && hit >= 0.55) return { label: "hot streak", value: Math.round(hit * 100), tone: "play" };
+  if (second < first * 0.92 && hit < 0.5) return { label: "cold streak", value: Math.round(hit * 100), tone: "fade" };
+  return { label: "steady form", value: Math.round(hit * 100), tone: "watch" };
+}
+
+function sparkline(values = [], line = 0) {
+  const safe = values.length ? values : [line || 1, line || 1];
+  const max = Math.max(...safe, line || 1);
+  const min = Math.min(...safe, line || 0);
+  const span = max - min || 1;
+  const points = safe.map((value, index) => {
+    const x = safe.length === 1 ? 50 : (index / (safe.length - 1)) * 100;
+    const y = 86 - ((value - min) / span) * 72;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const lineY = 86 - (((line || min) - min) / span) * 72;
+  return `<svg class="sparkline" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="${lineY}" x2="100" y2="${lineY}" class="sparkline-line"></line><polyline points="${points}"></polyline></svg>`;
+}
+
 function makeRecent(line, confidence) {
   const center = line * (0.9 + confidence / 180);
   return Array.from({ length: 10 }, (_, index) => {
@@ -329,11 +391,18 @@ function filteredPlayers() {
 function renderTeamFilter() {
   const current = $("#team-filter").value;
   const sport = $("#sport-filter").value;
-  const teams = [...new Set(players
+  const catalogTeams = sport === "All"
+    ? Object.values(catalog.teams || {}).flat()
+    : (catalog.teams?.[sport] || []);
+  const playerTeams = players
     .filter((player) => sport === "All" || player.sport === sport)
     .flatMap((player) => [player.team, player.opponent])
-    .filter(Boolean)
-  )].sort();
+    .filter(Boolean);
+  const liveTeams = liveRankings
+    .filter((row) => sport === "All" || row.sport === sport)
+    .flatMap((row) => [row.team, row.opponent, row.matchup])
+    .filter(Boolean);
+  const teams = [...new Set([...catalogTeams, ...playerTeams, ...liveTeams].map(compactTeamName).filter(Boolean))].sort();
 
   $("#team-filter").innerHTML = `<option value="All">All teams</option>${teams.map((team) => `<option value="${team}">${team}</option>`).join("")}`;
   $("#team-filter").value = teams.includes(current) ? current : "All";
@@ -364,6 +433,7 @@ async function loadCatalog() {
     };
   }
   renderPredictionSuggestions();
+  renderTeamFilter();
 }
 
 function renderPredictionSuggestions() {
@@ -372,7 +442,8 @@ function renderPredictionSuggestions() {
   const markets = catalog.markets?.[sport] || [];
   const names = [...new Set([
     ...basePlayers.filter((player) => player.sport === sport).map((player) => player.name),
-    ...customPlayers.filter((player) => player.sport === sport).map((player) => player.name)
+    ...customPlayers.filter((player) => player.sport === sport).map((player) => player.name),
+    ...livePlayerResults.filter((player) => player.sport === sport).map((player) => player.name)
   ])].sort();
 
   $("#team-suggestions").innerHTML = teams.map((team) => `<option value="${team}"></option>`).join("");
@@ -708,7 +779,14 @@ function analyzeQuestion(question) {
 }
 
 function renderQuickPrompts() {
-  $("#quick-prompts").innerHTML = quickPrompts
+  const sport = activeSport();
+  const top = liveRankings.find((row) => sport === "All" || row.sport === sport);
+  const dynamicPrompts = top ? [
+    { tag: "Live board", text: `Research ${top.name || top.matchup} ${top.market || "market"} at ${top.odds || "current odds"}` },
+    { tag: "Best line", text: `Where is the best ${top.sport} line for ${top.matchup || top.name}?` },
+    { tag: "Parlay", text: `Build a 3 leg ${top.sport} card from the live board.` }
+  ] : [];
+  $("#quick-prompts").innerHTML = [...dynamicPrompts, ...quickPrompts].slice(0, 7)
     .map((prompt) => `
       <button class="prompt" type="button" data-prompt="${prompt.text}">
         <span>${prompt.tag}</span>
@@ -732,7 +810,7 @@ function renderInsights() {
   const customInsights = customPlayers.map((player) => ({
     type: "Market",
     sport: player.sport,
-    title: `${player.name} added to your slate`,
+    title: `${player.name} added to tracked props`,
     body: `${player.market} ${player.line} is now available in chat, rankings, profiles, and parlay generation.`,
     player: player.name,
     score: player.confidence
@@ -794,24 +872,53 @@ function renderPlayers() {
     source: player.source || "sportsdataio",
     live: true
   }));
-  const cards = [...liveCards, ...localCards];
+  const rankingCards = liveRankings.slice(0, 18).map((row) => {
+    const line = Number(row.line ?? 0);
+    const confidence = Math.round(row.confidence || 62);
+    return {
+      name: row.name || row.subject || row.player || row.matchup,
+      sport: row.sport,
+      team: compactTeamName(row.team),
+      opponent: compactTeamName(row.opponent),
+      market: row.market || "Market",
+      line,
+      recent: makeRecent(line || 1, confidence),
+      usage: Math.round(confidence * 0.35),
+      matchup: Math.max(5, Math.min(9, Math.round(confidence / 10))),
+      confidence,
+      note: `${row.book || "Best line"} ${row.odds || ""} ${row.commence_time ? `- ${formatEventTime(row.commence_time)}` : ""}`,
+      hotspots: [[42, 48], [58, 52], [50, 66]],
+      source: row.source || "live-ranking",
+      live: true
+    };
+  });
+  const seen = new Set();
+  const cards = [...liveCards, ...rankingCards, ...localCards].filter((player) => {
+    const key = `${player.sport}-${player.name}-${player.market}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   $("#player-grid").innerHTML = cards.map((player) => `
     <article class="player-card">
       <div class="player-head">
-        <div class="avatar">${player.name.split(" ").map((part) => part[0]).join("")}</div>
+        ${teamLogo(player.team || player.name, player.sport)}
         <div>
           <h3>${player.name}</h3>
-          <p class="muted">${player.team} vs ${player.opponent} · ${player.sport}</p>
+          <p class="muted">${player.team || "Team"} vs ${player.opponent || "Opponent"} - ${player.sport}</p>
         </div>
       </div>
+      ${sparkline(player.recent, player.line)}
       <div class="bars">
         <span>Confidence ${player.confidence}%</span>
         <div class="bar"><span style="width:${player.confidence}%"></span></div>
-        <span>${player.live ? "Live profile source" : `Recent hit rate ${hitRate(player)}%`}</span>
-        <div class="bar"><span style="width:${player.live ? 80 : hitRate(player)}%"></span></div>
+        <span>${trendFor(player.recent, player.line).label} - ${player.live ? "provider profile" : `recent hit rate ${hitRate(player)}%`}</span>
+        <div class="bar"><span style="width:${player.live ? Math.max(55, player.confidence - 5) : hitRate(player)}%"></span></div>
       </div>
       <div class="metric-row">
+        <span class="pill">${player.market} ${player.line || ""}</span>
+        <span class="pill">${player.source || "model"}</span>
         <button class="prompt open-player" data-player="${player.name}">Open profile</button>
         ${player.live ? `<span class="pill">Live profile</span>` : ""}
         ${player.custom ? `<button class="remove-player" data-player="${player.name}">Remove</button>` : ""}
@@ -888,7 +995,9 @@ function sourceLabel(source) {
     "sportsdataio-stats": "Live stats",
     "model-fallback": "Model fallback",
     "browser-fallback": "Browser fallback",
-    "baseline-slate": "Baseline slate"
+    "baseline-slate": "Modeled fallback",
+    "live-best-line": "Live best line",
+    "live-ranking": "Live ranking"
   }[source] || source || "Fallback";
 }
 
@@ -940,6 +1049,28 @@ function formatParlayAnswer(card) {
   return `<strong>Generated ${card.pool.length}-leg research card</strong>${card.pool.map((player) => `${player.name} ${player.market} over ${player.line}: ${player.confidence}% confidence`).join("<br>")}<div class="metric-row"><span class="pill">Combined confidence ${card.combined}%</span><span class="pill">Check live lines before acting</span></div>`;
 }
 
+function rankingToPrediction(row) {
+  const line = Number(row.line ?? 0);
+  const odds = Number(row.odds || -110);
+  const confidence = Math.max(0.48, Math.min(0.9, Number(row.confidence || 62) / 100));
+  return {
+    subject: row.name || row.subject || row.player || row.matchup,
+    sport: row.sport,
+    team: compactTeamName(row.team),
+    market: row.market || "Market",
+    line,
+    odds,
+    confidence,
+    hit_rate: Math.max(0.48, Math.min(0.86, confidence + 0.03)),
+    edge: Number((confidence - oddsToProbability(odds)).toFixed(3)),
+    recommendation: confidence > 0.62 ? "Play" : "Watch",
+    source: row.source || "live-ranking",
+    sample_size: row.books_checked || 0,
+    explanation: `${row.matchup || "Live board"}${row.book ? ` - best price at ${row.book}` : ""}${row.commence_time ? ` - ${formatEventTime(row.commence_time)}` : ""}`,
+    validation: row.source?.includes("live") ? ["Live provider board. Confirm final injury/lineup news before using."] : ["Provider fallback. Add live odds/stats keys for stronger coverage."]
+  };
+}
+
 async function renderParlay() {
   const legs = Number($("#legs-input").value);
   const risk = $("#risk-input").value;
@@ -949,9 +1080,20 @@ async function renderParlay() {
     manualPredictions.push(await getPrediction(leg));
   }
 
+  if (!liveRankings.length) await loadRankingsData(false);
   const remaining = Math.max(0, legs - manualPredictions.length);
-  const card = buildParlay(remaining || legs, risk, focus);
-  const samplePredictions = manualPredictions.length >= legs ? [] : card.pool.slice(0, remaining).map((player) => ({
+  const livePool = liveRankings
+    .filter((row) => focus === "All" || row.sport === focus)
+    .filter((row) => !manualPredictions.some((leg) => String(leg.subject).toLowerCase() === String(row.name || row.subject).toLowerCase()))
+    .sort((a, b) => {
+      if (risk === "safer") return (b.confidence || 0) - (a.confidence || 0);
+      if (risk === "upside") return Math.abs(Number(b.odds || -110)) - Math.abs(Number(a.odds || -110));
+      return ((b.confidence || 0) + Math.max(0, Number(b.edge || 0) * 100)) - ((a.confidence || 0) + Math.max(0, Number(a.edge || 0) * 100));
+    })
+    .slice(0, remaining)
+    .map(rankingToPrediction);
+  const card = buildParlay(Math.max(0, remaining - livePool.length), risk, focus);
+  const fallbackPredictions = manualPredictions.length + livePool.length >= legs ? [] : card.pool.slice(0, remaining - livePool.length).map((player) => ({
     subject: player.name,
     sport: player.sport,
     team: player.team,
@@ -966,7 +1108,7 @@ async function renderParlay() {
     sample_size: player.recent.length,
     explanation: player.note
   }));
-  const allLegs = [...manualPredictions, ...samplePredictions].slice(0, legs);
+  const allLegs = [...manualPredictions, ...livePool, ...fallbackPredictions].slice(0, legs);
   lastParlayLegs = allLegs;
   const combined = allLegs.length
     ? Math.round((allLegs.reduce((sum, leg) => sum + Number(leg.confidence || 0), 0) / allLegs.length) * 100)
@@ -1011,6 +1153,10 @@ async function saveParlayCard() {
 }
 
 async function renderRankings() {
+  await loadRankingsData(true);
+}
+
+async function loadRankingsData(render = true) {
   const sport = $("#sport-filter").value;
   const team = $("#team-filter").value;
   let rows = [];
@@ -1033,6 +1179,11 @@ async function renderRankings() {
       source: "browser-fallback"
     }));
   }
+  liveRankings = rows;
+  renderTeamFilter();
+  renderPredictionSuggestions();
+  renderQuickPrompts();
+  if (!render) return rows;
   $("#ranking-table").innerHTML = `
     <div class="rank-row header">
       <span>Rank</span><span>Player</span><span>Sport</span><span>Market</span><span>Confidence</span>
@@ -1047,6 +1198,7 @@ async function renderRankings() {
       </div>
     `).join("") || `<div class="rank-row"><span></span><span>No live rankings yet.</span><span></span><span></span><span></span></div>`}
   `;
+  return rows;
 }
 
 function localEngineSnapshot() {
@@ -1191,6 +1343,21 @@ function renderAnalytics() {
   const database = status?.database || {};
   const clvCount = analytics?.clv_tracked || 0;
   const avgClv = analytics?.average_clv ?? 0;
+  const hitPct = Math.round((analytics?.hit_rate || 0) * 100);
+  const providerScore = [
+    status?.providers?.odds_api_connected || status?.odds_api_connected,
+    status?.providers?.sportsdata_api_connected || status?.sportsdata_api_connected,
+    status?.weather_api_connected,
+    database.ready
+  ].filter(Boolean).length;
+  $("#analytics-chart").innerHTML = `
+    <div><strong>${hitPct}%</strong><span>tracked hit rate</span><div class="bar"><span style="width:${hitPct}%"></span></div></div>
+    <div><strong>${analytics?.total_predictions || 0}</strong><span>logged predictions</span><div class="bar"><span style="width:${Math.min(100, (analytics?.total_predictions || 0) * 8)}%"></span></div></div>
+  `;
+  $("#provider-chart").innerHTML = `
+    <div><strong>${providerScore}/4</strong><span>connected systems</span><div class="bar"><span style="width:${providerScore * 25}%"></span></div></div>
+    <div><strong>${liveRankings.length}</strong><span>live board rows</span><div class="bar"><span style="width:${Math.min(100, liveRankings.length * 4)}%"></span></div></div>
+  `;
   $("#analytics-summary").innerHTML = analytics ? `
     <div class="engine-item"><strong>Total predictions</strong>${analytics.total_predictions}</div>
     <div class="engine-item"><strong>Tracked hit rate</strong>${Math.round((analytics.hit_rate || 0) * 100)}% (${analytics.wins || 0}-${analytics.losses || 0}-${analytics.pushes || 0})</div>
@@ -1270,6 +1437,52 @@ function renderAnalytics() {
   $("#run-settlement")?.addEventListener("click", runSettlement);
   $$(".grade-btn").forEach((button) => button.addEventListener("click", () => gradePrediction(button.dataset.id, button.dataset.outcome)));
   $$(".clv-btn").forEach((button) => button.addEventListener("click", () => updateClosingLine(button.dataset.id)));
+  renderProfile();
+}
+
+function renderProfile() {
+  const account = $("#profile-account");
+  const tracking = $("#profile-tracking");
+  const saved = $("#profile-saved");
+  if (!account || !tracking || !saved) return;
+  account.innerHTML = currentUser ? `
+    <div class="engine-item"><strong>${currentUser.username}</strong>Profile is active. Saved cards, alerts, and watchlists are stored on the server when the database is ready.</div>
+    <button class="mini-btn" type="button" id="profile-logout">Log out</button>
+  ` : `
+    <div class="engine-item"><strong>Create a free profile</strong>Use this to track predictions, saved cards, watchlists, alerts, CLV, and accuracy.</div>
+    <input class="mini-input" id="profile-username" autocomplete="username" placeholder="Username">
+    <input class="mini-input" id="profile-password" autocomplete="current-password" type="password" placeholder="Password">
+    <div class="metric-row"><button class="mini-btn" type="button" id="profile-login">Log in</button><button class="mini-btn" type="button" id="profile-register">Register</button></div>
+  `;
+  const localTracked = customPlayers.length + watchlist.length;
+  tracking.innerHTML = `
+    <div class="engine-item"><strong>Watchlist items</strong>${serverWatchlist.length || watchlist.length} server/local</div>
+    <div class="engine-item"><strong>Custom tracked props</strong>${customPlayers.length}</div>
+    <div class="engine-item"><strong>Alerts</strong>${serverAlerts.length} active/server alerts</div>
+    <div class="engine-item"><strong>Local profile data</strong>${localTracked} items stored in this browser</div>
+  `;
+  saved.innerHTML = `
+    ${(savedCards || []).map((card) => `<div class="engine-item"><strong>${card.name}</strong>${(card.legs || []).length} legs saved</div>`).join("") || `<div class="engine-item"><strong>No saved cards yet</strong>Generate a parlay card and press Save card to track it here.</div>`}
+    ${(analyticsSnapshot?.analytics?.recent || []).slice(-5).reverse().map((row) => `<div class="engine-item"><strong>${row.subject} - ${row.market}</strong>${row.recommendation} - ${Math.round((row.confidence || 0) * 100)}% - ${row.outcome || "pending"}</div>`).join("")}
+  `;
+  $("#profile-login")?.addEventListener("click", () => submitProfileAuth("login"));
+  $("#profile-register")?.addEventListener("click", () => submitProfileAuth("register"));
+  $("#profile-logout")?.addEventListener("click", logoutUser);
+}
+
+async function submitProfileAuth(action) {
+  const username = $("#profile-username")?.value.trim();
+  const password = $("#profile-password")?.value;
+  if (!username || !password) return;
+  try {
+    const data = await postJson(`/api/auth/${action}`, { username, password });
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+    await loadAnalytics();
+  } catch (error) {
+    alert(error.message || "Profile request failed.");
+  }
 }
 
 function renderInlineMap(object) {
@@ -1380,13 +1593,14 @@ function switchView(view) {
   $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   $$(".view").forEach((section) => section.classList.toggle("active", section.id === view));
   $("#view-title").textContent = titles[view];
+  if (view === "profile") renderProfile();
+  if (view === "analytics") renderAnalytics();
 }
 
 function refreshAll() {
   renderTeamFilter();
   renderInsights();
   renderPlayers();
-  renderParlay();
   renderRankings();
   renderEngine();
   renderAnalytics();
@@ -1410,7 +1624,7 @@ function addCustomPlayer(event) {
     usage: Math.round(confidence * 0.4),
     matchup: Math.max(5, Math.min(9, Math.round(confidence / 10))),
     confidence,
-    note: "Custom slate entry. Replace the line or market any time by removing it and adding an updated version.",
+    note: "Custom tracked prop. Replace the line or market any time by removing it and adding an updated version.",
     hotspots: [[40, 44], [56, 52], [48, 68]],
     custom: true
   };
@@ -1482,11 +1696,8 @@ $("#custom-sport").addEventListener("change", searchLivePlayers);
 $("#prediction-form").addEventListener("submit", submitPrediction);
 $("#theme-toggle")?.addEventListener("click", toggleTheme);
 $("#refresh-btn").addEventListener("click", () => {
-  players.forEach((player) => {
-    player.confidence = Math.max(58, Math.min(91, player.confidence + Math.round(Math.random() * 6 - 3)));
-  });
-  refreshAll();
-  loadEngineSnapshot();
+  Promise.all([loadRankingsData(false), loadLiveInsights(), loadEngineSnapshot(), loadAnalytics(), loadMarketSources()])
+    .finally(refreshAll);
 });
 $("#close-dialog").addEventListener("click", () => $("#player-dialog").close());
 
@@ -1496,6 +1707,12 @@ renderChatIntro();
 refreshAll();
 loadCurrentUser().finally(() => {
   loadCatalog();
+  loadRankingsData(false).then(() => {
+    renderTeamFilter();
+    renderPlayers();
+    renderRankings();
+    renderParlay();
+  });
   loadLiveInsights();
   loadEngineSnapshot();
   loadAnalytics();
@@ -1503,5 +1720,10 @@ loadCurrentUser().finally(() => {
 });
 setInterval(loadEngineSnapshot, 60000);
 setInterval(loadLiveInsights, 60000);
+setInterval(() => loadRankingsData(false).then(() => {
+  renderTeamFilter();
+  renderPlayers();
+  renderRankings();
+}), 60000);
 setInterval(loadAnalytics, 60000);
 setInterval(loadMarketSources, 300000);

@@ -18,6 +18,9 @@
         </div>
 
         <nav class="nav" aria-label="Primary">
+          <button class="nav-item" data-view="profile" title="Profile">
+            <span>Profile</span> Profile
+          </button>
           <button class="nav-item active" data-view="research" title="Research">
             <span>⌕</span> Research
           </button>
@@ -156,6 +159,23 @@
           </div>
         </section>
 
+        <section id="profile" class="view">
+          <div class="engine-grid">
+            <section class="engine-panel">
+              <h2>Your profile</h2>
+              <div id="profile-account" class="engine-list"></div>
+            </section>
+            <section class="engine-panel">
+              <h2>Tracking center</h2>
+              <div id="profile-tracking" class="engine-list"></div>
+            </section>
+            <section class="engine-panel span-2">
+              <h2>Saved research</h2>
+              <div id="profile-saved" class="engine-list"></div>
+            </section>
+          </div>
+        </section>
+
         <section id="insights" class="view">
           <div class="toolbar">
             <input id="insight-search" type="search" placeholder="Filter insights..." />
@@ -245,7 +265,7 @@
                 <div class="form-grid">
                   <label>
                     Player/team
-                    <input id="parlay-subject" placeholder="James Harden or Celtics" />
+                    <input id="parlay-subject" list="player-suggestions" placeholder="James Harden or Celtics" />
                   </label>
                   <label>
                     Market
@@ -301,10 +321,12 @@
           <div class="engine-grid">
             <section class="engine-panel">
               <h2>Prediction analytics</h2>
+              <div id="analytics-chart" class="mini-chart"></div>
               <div id="analytics-summary" class="engine-list"></div>
             </section>
             <section class="engine-panel">
               <h2>Provider health</h2>
+              <div id="provider-chart" class="mini-chart"></div>
               <div id="provider-health" class="engine-list"></div>
             </section>
             <section class="engine-panel span-2">

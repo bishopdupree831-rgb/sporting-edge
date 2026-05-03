@@ -1,15 +1,15 @@
 :root {
-  --ink: #15202b;
-  --muted: #69717d;
-  --line: #dce3ea;
-  --paper: #f7f9fb;
+  --ink: #142018;
+  --muted: #66705e;
+  --line: #d9dfcf;
+  --paper: #f8f9f1;
   --panel: #ffffff;
-  --soft: #fbfdfe;
-  --sidebar: #0e2730;
+  --soft: #fbfcf4;
+  --sidebar: #07351f;
   --sidebar-text: #eef6f7;
-  --green: #0b7a53;
-  --teal: #147c89;
-  --gold: #b56a00;
+  --green: #08763f;
+  --teal: #0c6d4d;
+  --gold: #c99718;
   --red: #b8353b;
   --blue: #285aa6;
   --shadow: 0 18px 50px rgba(21, 32, 43, 0.1);
@@ -18,15 +18,15 @@
 :root[data-theme="night"] {
   --ink: #edf7f8;
   --muted: #aabcc2;
-  --line: #25434b;
-  --paper: #08181e;
-  --panel: #10252c;
-  --soft: #132d35;
-  --sidebar: #061318;
+  --line: #335035;
+  --paper: #07150d;
+  --panel: #102418;
+  --soft: #142c1e;
+  --sidebar: #031009;
   --sidebar-text: #ecfbfb;
-  --green: #41c795;
-  --teal: #55c5d1;
-  --gold: #e4a139;
+  --green: #45c486;
+  --teal: #8fd8a8;
+  --gold: #f0bd45;
   --red: #f06d74;
   --blue: #78a9ff;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
@@ -677,15 +677,18 @@ input {
   gap: 12px;
 }
 
-.avatar {
+.avatar,
+.team-logo {
   display: grid;
   place-items: center;
   width: 54px;
   height: 54px;
+  flex: 0 0 54px;
   border-radius: 8px;
   color: #fff;
   font-weight: 900;
-  background: linear-gradient(135deg, #285aa6, #0b7a53);
+  background: linear-gradient(135deg, var(--green), var(--gold));
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
 }
 
 .player-head {
@@ -711,6 +714,53 @@ input {
   height: 100%;
   border-radius: inherit;
   background: var(--green);
+}
+
+.sparkline {
+  width: 100%;
+  height: 62px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(201, 151, 24, 0.1), rgba(8, 118, 63, 0.06));
+}
+
+.sparkline polyline {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparkline-line {
+  stroke: var(--gold);
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+  opacity: 0.75;
+}
+
+.mini-chart {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mini-chart > div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.mini-chart strong {
+  font-size: 26px;
+}
+
+.mini-chart span {
+  color: var(--muted);
+  font-weight: 750;
 }
 
 .builder-panel {

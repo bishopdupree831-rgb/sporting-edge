@@ -2035,7 +2035,7 @@ def catalog() -> dict[str, Any]:
     return {
         "teams": TEAM_CATALOG,
         "markets": MARKET_CATALOG,
-        "sample_players": SAMPLE_PLAYERS,
+        "players": SAMPLE_PLAYERS,
         "providers": {
             "odds_api_connected": bool(odds_api_key()),
             "sportsdata_api_connected": bool(sportsdata_key()),
@@ -2044,6 +2044,27 @@ def catalog() -> dict[str, Any]:
             "news_context_endpoints": ["/api/news/{sport}", "/api/context/{sport}"],
             "best_line_endpoint": "/api/best-lines/{sport}",
         },
+    }
+
+
+@app.get("/api/live-board")
+def live_board(sport: str = "All", team: str = "All") -> dict[str, Any]:
+    rankings_data = ranking_rows(sport, team)
+    insights_data = live_insight_rows(sport, "")
+    snapshot = LATEST if LATEST.get("all_bets") else engine_tick()
+    return {
+        "sport": sport,
+        "team": team,
+        "rankings": rankings_data.get("rankings", []),
+        "insights": insights_data.get("insights", []),
+        "engine": snapshot,
+        "providers": {
+            **rankings_data.get("providers", {}),
+            "weather_api_connected": bool(weather_api_key()),
+            "database_ready": DB_READY,
+        },
+        "source": rankings_data.get("source"),
+        "updated_at": int(time.time()),
     }
 
 

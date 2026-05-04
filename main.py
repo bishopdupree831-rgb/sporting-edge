@@ -202,32 +202,6 @@ CACHE: dict[str, tuple[float, Any]] = {}
 PREDICTION_LOG: list[dict[str, Any]] = []
 DB_READY = False
 
-SAMPLE_PLAYERS = [
-    {"name": "Jalen Brunson", "sport": "NBA", "minutes": 36.4, "usage": 0.31, "role": "primary", "market": "Points"},
-    {"name": "Luka Doncic", "sport": "NBA", "minutes": 37.1, "usage": 0.34, "role": "primary", "market": "Points"},
-    {"name": "Christian McCaffrey", "sport": "NFL", "minutes": 42.0, "usage": 0.30, "role": "primary", "market": "Rush+Rec Yards"},
-    {"name": "CeeDee Lamb", "sport": "NFL", "minutes": 39.0, "usage": 0.28, "role": "primary", "market": "Receptions"},
-    {"name": "Mookie Betts", "sport": "MLB", "minutes": 38.0, "usage": 0.27, "role": "primary", "market": "Total Bases"},
-    {"name": "Bobby Witt Jr.", "sport": "MLB", "minutes": 37.5, "usage": 0.26, "role": "primary", "market": "Hits"},
-    {"name": "Connor McDavid", "sport": "NHL", "minutes": 21.5, "usage": 0.33, "role": "primary", "market": "Points"},
-    {"name": "Auston Matthews", "sport": "NHL", "minutes": 20.8, "usage": 0.31, "role": "primary", "market": "Shots On Goal"},
-    {"name": "Islam Makhachev", "sport": "MMA", "minutes": 25.0, "usage": 0.32, "role": "primary", "market": "Takedowns"},
-    {"name": "Sean O'Malley", "sport": "MMA", "minutes": 25.0, "usage": 0.29, "role": "primary", "market": "Significant Strikes"},
-]
-
-SAMPLE_PROPS = {
-    "Jalen Brunson": {"line": 27.5, "odds": -110, "market": "Points", "scale": 90},
-    "Luka Doncic": {"line": 30.5, "odds": -110, "market": "Points", "scale": 92},
-    "Christian McCaffrey": {"line": 112.5, "odds": -115, "market": "Rush+Rec Yards", "scale": 380},
-    "CeeDee Lamb": {"line": 6.5, "odds": -105, "market": "Receptions", "scale": 24},
-    "Mookie Betts": {"line": 1.5, "odds": -120, "market": "Total Bases", "scale": 7},
-    "Bobby Witt Jr.": {"line": 1.5, "odds": +105, "market": "Hits", "scale": 5.8},
-    "Connor McDavid": {"line": 1.5, "odds": -110, "market": "Points", "scale": 5.5},
-    "Auston Matthews": {"line": 3.5, "odds": -115, "market": "Shots On Goal", "scale": 12},
-    "Islam Makhachev": {"line": 2.5, "odds": -125, "market": "Takedowns", "scale": 11},
-    "Sean O'Malley": {"line": 74.5, "odds": -110, "market": "Significant Strikes", "scale": 270},
-}
-
 MARKET_SOURCE_STACK = [
     {"name": "Dimers / Sports-AI style", "role": "true_probability", "use": "Compare model probability against book implied probability."},
     {"name": "OddsTrader / BettingPros style", "role": "best_lines", "use": "Find the best available price and line across books."},
@@ -962,13 +936,13 @@ def predict_market(request: PredictionRequest) -> dict[str, Any]:
         "edge": round(edge, 3),
         "confidence": round(confidence, 3),
         "recommendation": recommendation,
-        "source": "model-fallback",
+        "source": "manual-model",
         "best_lines": relevant_best_lines(sport, request),
         "sample_size": 0,
         "validation": [
             "No player-specific SportsDataIO stat feed was available for this prediction."
         ] if sportsdata_key() else [
-            "SPORTSDATA_API_KEY is not connected, so this uses a generic model fallback."
+            "Live provider not connected. Using manual mode."
         ] + context_warnings(sport, subject),
         "explanation": (
             f"{subject} {market} is projected around {round(statistics.mean(simulated), 2)} against a "
@@ -1256,12 +1230,13 @@ def fetch_nba_players() -> list[dict[str, Any]]:
 
 def fetch_players() -> list[dict[str, Any]]:
     live_nba = fetch_nba_players()
-    names = {player["name"] for player in live_nba}
-    return live_nba + [player for player in SAMPLE_PLAYERS if player["name"] not in names]
+    return live_nba
 
 
 def fetch_props() -> dict[str, dict[str, Any]]:
-    return SAMPLE_PROPS
+    # Production live pages must not invent player props. Manual simulator
+    # entries still work, and live props should come through sportsbook routes.
+    return {}
 
 
 def odds_api_key() -> str | None:
@@ -1837,24 +1812,8 @@ def ranking_rows(sport: str = "All", team: str = "All") -> dict[str, Any]:
         rows = live_rows
         source = "live-best-lines"
     else:
-        snapshot = LATEST if LATEST.get("all_bets") else engine_tick()
-        rows = [
-            {
-                "name": bet["name"],
-                "team": "",
-                "opponent": "",
-                "sport": bet.get("sport"),
-                "market": bet.get("market"),
-                "line": bet.get("line"),
-                "odds": bet.get("odds"),
-                "confidence": round(float(bet.get("confidence", 0)) * 100),
-                "source": "model-ranking",
-                "book": None,
-                "matchup": "",
-            }
-            for bet in snapshot.get("all_bets", [])
-        ]
-        source = snapshot.get("mode", "model-ranking")
+        rows = []
+        source = "live-provider-unavailable"
 
     if sport != "All":
         rows = [row for row in rows if row.get("sport") == sport.upper()]
@@ -1924,27 +1883,13 @@ def live_insight_rows(sport: str = "All", query: str = "") -> dict[str, Any]:
             if lowered in " ".join(str(row.get(key, "")) for key in ["title", "body", "player", "sport", "type"]).lower()
         ]
 
-    if not rows:
-        snapshot = LATEST if LATEST.get("insights") else engine_tick()
-        rows = [
-            {
-                "type": "Model",
-                "sport": "All",
-                "title": insight,
-                "body": "Generated from the local model fallback because live insight feeds were unavailable.",
-                "player": "",
-                "score": 60,
-                "source": "model-fallback",
-            }
-            for insight in snapshot.get("insights", [])
-        ]
-
     return {
-        "source": "live-context" if rows and rows[0].get("source") != "model-fallback" else "model-fallback",
+        "source": "live-context" if rows else "live-provider-unavailable",
         "providers": {
             "odds_api_connected": bool(odds_api_key()),
             "sportsdata_api_connected": bool(sportsdata_key()),
         },
+        "message": "Live provider not connected. Using manual mode." if not rows else "Live insight feed loaded.",
         "insights": sorted(rows, key=lambda row: row.get("score", 0), reverse=True)[:60],
     }
 
@@ -1979,11 +1924,12 @@ def engine_tick() -> dict[str, Any]:
           live_sports.append(sport)
 
     mode = "live odds + stats engine" if live_sports and sportsdata_key() else (
-        "live odds engine" if live_sports else "model fallback engine"
+        "live odds engine" if live_sports else "manual mode"
     )
 
     return {
         "mode": mode,
+        "message": "Live provider not connected. Using manual mode." if not live_sports else "Live odds feed loaded.",
         "providers": {
             "odds_api_connected": bool(odds_api_key()),
             "sportsdata_api_connected": bool(sportsdata_key()),
@@ -2056,7 +2002,7 @@ def catalog() -> dict[str, Any]:
     return {
         "teams": TEAM_CATALOG,
         "markets": MARKET_CATALOG,
-        "players": SAMPLE_PLAYERS,
+        "players": [],
         "providers": {
             "odds_api_connected": bool(odds_api_key()),
             "sportsdata_api_connected": bool(sportsdata_key()),
@@ -2094,14 +2040,11 @@ def players_search(sport: str, q: str = "") -> dict[str, Any]:
     sport = sport.upper()
     players, path = sportsdata_first(sport, "players")
     if not isinstance(players, list):
-        fallback = [
-            player for player in SAMPLE_PLAYERS
-            if player["sport"] == sport and q.lower() in player["name"].lower()
-        ]
         return {
             "sport": sport,
-            "source": "sample-fallback",
-            "players": fallback,
+            "source": "live-provider-unavailable",
+            "message": "Live provider not connected. Using manual mode.",
+            "players": [],
         }
 
     lowered = q.lower().strip()
@@ -2143,7 +2086,7 @@ def odds(sport: str) -> dict[str, Any]:
     live_odds = fetch_live_odds(sport)
     return {
         "sport": sport.upper(),
-        "source": "the-odds-api" if live_odds else "sample-fallback",
+        "source": "the-odds-api" if live_odds else "live-provider-unavailable",
         "odds": live_odds,
     }
 

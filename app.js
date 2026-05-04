@@ -3,236 +3,22 @@ const WATCHLIST_KEY = "edgelab.watchlist";
 const AUTH_TOKEN_KEY = "edgelab.authToken";
 const THEME_KEY = "edgelab.theme";
 
-const basePlayers = [
-  {
-    name: "Jalen Brunson",
-    sport: "NBA",
-    team: "NYK",
-    opponent: "IND",
-    market: "Points",
-    line: 27.5,
-    recent: [31, 28, 34, 24, 29, 37, 22, 30, 33, 26],
-    usage: 32,
-    matchup: 7,
-    confidence: 74,
-    note: "High on-ball load, strong late-clock usage, and a guard-friendly matchup profile.",
-    hotspots: [[45, 72], [58, 58], [36, 42]]
-  },
-  {
-    name: "Anthony Edwards",
-    sport: "NBA",
-    team: "MIN",
-    opponent: "DEN",
-    market: "Threes",
-    line: 2.5,
-    recent: [4, 3, 1, 5, 3, 2, 4, 4, 2, 3],
-    usage: 30,
-    matchup: 6,
-    confidence: 69,
-    note: "Volume is stable and the matchup tends to concede pull-up attempts above the break.",
-    hotspots: [[28, 32], [70, 33], [52, 46]]
-  },
-  {
-    name: "Christian McCaffrey",
-    sport: "NFL",
-    team: "SF",
-    opponent: "SEA",
-    market: "Rush+Rec Yards",
-    line: 112.5,
-    recent: [128, 99, 141, 118, 87, 132, 121, 109, 136, 115],
-    usage: 29,
-    matchup: 8,
-    confidence: 78,
-    note: "Elite snap share and target floor give this profile multiple ways to clear.",
-    hotspots: [[44, 58], [54, 66], [50, 38]]
-  },
-  {
-    name: "CeeDee Lamb",
-    sport: "NFL",
-    team: "DAL",
-    opponent: "PHI",
-    market: "Receptions",
-    line: 6.5,
-    recent: [9, 7, 6, 11, 8, 5, 10, 7, 8, 9],
-    usage: 28,
-    matchup: 7,
-    confidence: 72,
-    note: "Target share spikes against zone looks, with a favorable slot alignment path.",
-    hotspots: [[33, 54], [60, 44], [68, 70]]
-  },
-  {
-    name: "Mookie Betts",
-    sport: "MLB",
-    team: "LAD",
-    opponent: "ARI",
-    market: "Total Bases",
-    line: 1.5,
-    recent: [2, 1, 4, 0, 3, 2, 2, 1, 5, 2],
-    usage: 24,
-    matchup: 8,
-    confidence: 71,
-    note: "Recent hard-contact rate and platoon advantage both point in the same direction.",
-    hotspots: [[42, 40], [60, 36], [50, 52]]
-  },
-  {
-    name: "Bobby Witt Jr.",
-    sport: "MLB",
-    team: "KC",
-    opponent: "CHW",
-    market: "Hits",
-    line: 1.5,
-    recent: [2, 2, 1, 3, 0, 2, 1, 2, 2, 1],
-    usage: 25,
-    matchup: 6,
-    confidence: 66,
-    note: "Contact profile is strong, but the line needs two hits, so confidence stays moderate.",
-    hotspots: [[38, 46], [56, 38], [63, 58]]
-  },
-  {
-    name: "Connor McDavid",
-    sport: "NHL",
-    team: "EDM",
-    opponent: "VAN",
-    market: "Points",
-    line: 1.5,
-    recent: [2, 1, 3, 2, 0, 2, 1, 3, 2, 1],
-    usage: 33,
-    matchup: 8,
-    confidence: 73,
-    note: "Elite ice time and power-play role keep his point markets in range when pace is up.",
-    hotspots: [[42, 40], [54, 42], [60, 55]]
-  },
-  {
-    name: "Auston Matthews",
-    sport: "NHL",
-    team: "TOR",
-    opponent: "BOS",
-    market: "Shots On Goal",
-    line: 3.5,
-    recent: [5, 4, 3, 6, 4, 2, 5, 4, 6, 3],
-    usage: 31,
-    matchup: 7,
-    confidence: 70,
-    note: "Shot volume is driven by power-play touches, home matchup, and opponent shot suppression.",
-    hotspots: [[36, 45], [52, 38], [66, 52]]
-  },
-  {
-    name: "Islam Makhachev",
-    sport: "MMA",
-    team: "Makhachev",
-    opponent: "Tsarukyan",
-    market: "Takedowns",
-    line: 2.5,
-    recent: [4, 3, 5, 2, 6, 3, 4, 2, 5, 4],
-    usage: 27,
-    matchup: 8,
-    confidence: 75,
-    note: "Grappling pace and control-time paths create multiple ways to clear a takedown prop.",
-    hotspots: [[44, 54], [52, 42], [58, 66]]
-  },
-  {
-    name: "Sean O'Malley",
-    sport: "MMA",
-    team: "O'Malley",
-    opponent: "Dvalishvili",
-    market: "Significant Strikes",
-    line: 74.5,
-    recent: [91, 68, 104, 76, 82, 61, 95, 73, 88, 79],
-    usage: 26,
-    matchup: 6,
-    confidence: 67,
-    note: "Striking volume is attractive, but wrestling pressure adds round-by-round volatility.",
-    hotspots: [[40, 36], [62, 46], [50, 62]]
-  }
-];
+const basePlayers = [];
 
 let customPlayers = loadCustomPlayers();
 let players = [...basePlayers, ...customPlayers];
 
-const insights = [
-  {
-    type: "Usage",
-    sport: "NBA",
-    title: "Brunson usage is holding above 31%",
-    body: "His last-ten touch share is up while New York is shortening the rotation. The points line is fair, but the over has a clean workload argument.",
-    player: "Jalen Brunson",
-    score: 84
-  },
-  {
-    type: "Matchup",
-    sport: "NFL",
-    title: "Seattle has struggled with RB receiving volume",
-    body: "San Francisco can attack the linebackers in space. McCaffrey's combined yardage market gets a boost because both rushing and receiving paths are live.",
-    player: "Christian McCaffrey",
-    score: 88
-  },
-  {
-    type: "Market",
-    sport: "MLB",
-    title: "Betts total bases remains playable",
-    body: "The live-ready model grades his 1.5 total bases line as a small edge against a pitcher allowing elevated barrel contact.",
-    player: "Mookie Betts",
-    score: 76
-  },
-  {
-    type: "Injury",
-    sport: "NBA",
-    title: "Minnesota wing depth watch",
-    body: "If the rotation stays thin, Edwards should keep extra creation reps. His threes profile benefits more than his assists profile.",
-    player: "Anthony Edwards",
-    score: 72
-  },
-  {
-    type: "Matchup",
-    sport: "NFL",
-    title: "Dallas slot leverage is real",
-    body: "Philadelphia's pressure rate can force quick-game volume. Lamb's receptions line is a better fit than long-yardage exposure.",
-    player: "CeeDee Lamb",
-    score: 79
-  },
-  {
-    type: "Market",
-    sport: "MLB",
-    title: "Witt hits line carries volatility",
-    body: "The matchup is positive, but the two-hit threshold creates a narrower margin than total bases or runs markets.",
-    player: "Bobby Witt Jr.",
-    score: 68
-  },
-  {
-    type: "Environment",
-    sport: "NHL",
-    title: "Indoor ice keeps weather out, but pace still matters",
-    body: "NHL player props lean more on rink pace, power-play role, opponent shot suppression, and goalie workload than outside weather.",
-    player: "Connor McDavid",
-    score: 77
-  },
-  {
-    type: "Matchup",
-    sport: "MMA",
-    title: "Makhachev grappling path grades well",
-    body: "The takedown line is supported by chain-wrestling volume and control-time upside, though MMA props remain highly state-dependent.",
-    player: "Islam Makhachev",
-    score: 81
-  },
-  {
-    type: "Usage",
-    sport: "MMA",
-    title: "O'Malley volume depends on range control",
-    body: "His significant-strike line improves in open-space rounds but weakens if cage pressure limits exchanges.",
-    player: "Sean O'Malley",
-    score: 70
-  }
-];
+const insights = [];
 
 const quickPrompts = [
-  { tag: "Prop edge", text: "Is Brunson over 27.5 points worth researching?" },
-  { tag: "Alt line", text: "Find a safer alternate line for McDavid shots." },
+  { tag: "Prop edge", text: "Research a player prop from the live market board." },
+  { tag: "Alt line", text: "Find a safer alternate line for a selected prop." },
   { tag: "Parlay", text: "Build a 3 leg balanced card with low correlation risk." },
   { tag: "Sharp money", text: "Show me line movement and market edge signals." },
   { tag: "Injuries", text: "What late injury or roster news changes projections?" },
-  { tag: "Matchup", text: "Compare McCaffrey and Lamb for safest prop." },
-  { tag: "MLB", text: "What MLB insight has the strongest edge?" },
-  { tag: "MMA", text: "Which MMA prop has the best model score?" }
+  { tag: "Matchup", text: "Compare two selected players for safest prop." },
+  { tag: "MLB", text: "What MLB market has the strongest live edge?" },
+  { tag: "MMA", text: "Which MMA prop has the best live model score?" }
 ];
 
 const titles = {
@@ -469,26 +255,23 @@ function renderPredictionSuggestions() {
 }
 
 function localPrediction(payload) {
-  const confidence = estimateConfidence(payload.line, payload.sport);
-  const recent = makeRecent(payload.line, confidence);
-  const rate = recent.filter((value) => value > payload.line).length / recent.length;
   const implied = oddsToProbability(payload.odds || -110);
-  const edge = rate - implied;
-  const recommendation = edge > 0.06 ? "Play" : edge < -0.06 ? "Fade" : "Watch";
+  const edge = 0 - implied;
+  const recommendation = "Manual review";
 
   return {
     ...payload,
     subject: payload.player || payload.team || "Unknown",
-    projection: Number((recent.reduce((sum, value) => sum + value, 0) / recent.length).toFixed(2)),
-    hit_rate: Number(rate.toFixed(3)),
+    projection: Number(payload.line || 0),
+    hit_rate: 0,
     implied_probability: Number(implied.toFixed(3)),
     edge: Number(edge.toFixed(3)),
-    confidence: Number((rate * (1 - Math.min(Math.abs(edge), 0.35))).toFixed(3)),
+    confidence: 0,
     recommendation,
-    source: "browser-fallback",
+    source: "manual-mode",
     sample_size: 0,
-    validation: ["The backend prediction API was unavailable, so this browser fallback was used."],
-    explanation: "Local browser model. Add ODDS_API_KEY in Render for live event and odds access."
+    validation: ["Live provider not connected. Using manual mode."],
+    explanation: "No live provider result was available for this browser session. Enter manual context or connect provider keys before treating this as a live prediction."
   };
 }
 
@@ -721,7 +504,9 @@ function renderPrediction(result) {
   const resultSourceLabel = {
     "sportsdataio-stats": "Live stats model",
     "model-fallback": "Model fallback",
-    "browser-fallback": "Browser fallback"
+    "manual-model": "Manual model",
+    "browser-fallback": "Browser fallback",
+    "manual-mode": "Manual mode"
   }[result.source] || result.source || "Model";
   const validation = Array.isArray(result.validation) && result.validation.length
     ? `<div class="prediction-warnings">${result.validation.map((item) => `<div>${item}</div>`).join("")}</div>`
@@ -1040,7 +825,7 @@ function renderPlayers() {
     return true;
   });
 
-  $("#player-grid").innerHTML = cards.map((player) => `
+  $("#player-grid").innerHTML = cards.length ? cards.map((player) => `
     <article class="player-card">
       <div class="player-head">
         ${teamLogo(player.team || player.name, player.sport)}
@@ -1064,7 +849,7 @@ function renderPlayers() {
         ${player.custom ? `<button class="remove-player" data-player="${player.name}">Remove</button>` : ""}
       </div>
     </article>
-  `).join("");
+  `).join("") : `<div class="empty-market-state"><strong>No live player profiles loaded.</strong><p>Connect a working stats/roster provider or add a manual profile. No sample player cards are shown.</p></div>`;
 
   $$(".open-player").forEach((button) => button.addEventListener("click", () => openPlayer(button.dataset.player)));
   $$(".remove-player").forEach((button) => button.addEventListener("click", () => removeCustomPlayer(button.dataset.player)));
@@ -1134,8 +919,9 @@ function sourceLabel(source) {
   return {
     "sportsdataio-stats": "Live stats",
     "model-fallback": "Model fallback",
+    "manual-model": "Manual model",
     "browser-fallback": "Browser fallback",
-    "baseline-slate": "Modeled fallback",
+    "manual-mode": "Manual mode",
     "live-best-line": "Live best line",
     "live-ranking": "Live ranking"
   }[source] || source || "Fallback";
@@ -1232,23 +1018,7 @@ async function renderParlay() {
     })
     .slice(0, remaining)
     .map(rankingToPrediction);
-  const card = buildParlay(Math.max(0, remaining - livePool.length), risk, focus);
-  const fallbackPredictions = manualPredictions.length + livePool.length >= legs ? [] : card.pool.slice(0, remaining - livePool.length).map((player) => ({
-    subject: player.name,
-    sport: player.sport,
-    team: player.team,
-    market: player.market,
-    line: player.line,
-    odds: -110,
-    confidence: player.confidence / 100,
-    hit_rate: hitRate(player) / 100,
-    edge: Number((hitRate(player) / 100 - oddsToProbability(-110)).toFixed(3)),
-    recommendation: "Watch",
-    source: "baseline-slate",
-    sample_size: player.recent.length,
-    explanation: player.note
-  }));
-  const allLegs = [...manualPredictions, ...livePool, ...fallbackPredictions].slice(0, legs);
+  const allLegs = [...manualPredictions, ...livePool].slice(0, legs);
   lastParlayLegs = allLegs;
   const combined = allLegs.length
     ? Math.round((allLegs.reduce((sum, leg) => sum + Number(leg.confidence || 0), 0) / allLegs.length) * 100)
@@ -1260,7 +1030,7 @@ async function renderParlay() {
       <strong>${combined}%</strong>
       <div class="bar"><span style="width:${combined}%"></span></div>
     </div>
-    ${allLegs.map((leg, index) => `
+    ${allLegs.length ? allLegs.map((leg, index) => `
       <div class="leg">
         <strong>${index + 1}. ${leg.subject} over ${leg.line} ${leg.market}</strong>
         <span class="muted">${leg.explanation}</span>
@@ -1272,7 +1042,7 @@ async function renderParlay() {
         </div>
         ${Array.isArray(leg.validation) && leg.validation.length ? `<div class="prediction-warnings">${leg.validation.map((item) => `<div>${item}</div>`).join("")}</div>` : ""}
       </div>
-    `).join("")}
+    `).join("") : `<div class="empty-market-state"><strong>No parlay legs available.</strong><p>Add typed legs or connect live market providers. No sample slate legs are generated.</p></div>`}
     <button class="mini-btn full-width" type="button" id="save-parlay-card">Save card</button>
   `;
   $("#save-parlay-card")?.addEventListener("click", saveParlayCard);
@@ -1300,7 +1070,7 @@ async function loadRankingsData(render = true) {
   const sport = $("#sport-filter").value;
   const team = $("#team-filter").value;
   let rows = [];
-  let source = "browser fallback";
+  let source = "live-provider-unavailable";
   try {
     const response = await fetch(`/api/rankings?sport=${encodeURIComponent(sport)}&team=${encodeURIComponent(team)}`, { cache: "no-store" });
     if (!response.ok) throw new Error("rankings unavailable");
@@ -1308,16 +1078,8 @@ async function loadRankingsData(render = true) {
     rows = data.rankings || [];
     source = data.source || "live rankings";
   } catch {
-    rows = filteredPlayers().sort((a, b) => b.confidence - a.confidence).map((player) => ({
-      player: player.name,
-      subject: player.name,
-      sport: player.sport,
-      team: `${player.team} vs ${player.opponent}`,
-      market: `${player.market} ${player.line}`,
-      confidence: player.confidence,
-      best_book: "fallback",
-      source: "browser-fallback"
-    }));
+    rows = [];
+    source = "Live provider not connected. Using manual mode.";
   }
   liveRankings = rows;
   renderTeamFilter();
@@ -1336,7 +1098,7 @@ async function loadRankingsData(render = true) {
         <span>${row.market}${row.line !== null && row.line !== undefined ? ` ${row.line}` : ""}${row.book || row.best_book ? `<br><span class="muted">${row.book || row.best_book}</span>` : ""}${row.commence_time ? `<br><span class="muted">${formatEventTime(row.commence_time)}</span>` : ""}${row.venue ? `<br><span class="muted">${row.venue}</span>` : ""}</span>
         <span>${Math.round(row.confidence || 0)}%</span>
       </div>
-    `).join("") || `<div class="rank-row"><span></span><span>No live rankings yet.</span><span></span><span></span><span></span></div>`}
+    `).join("") || `<div class="rank-row"><span></span><span>No live rankings yet. Live provider not connected or returned no matching markets.</span><span></span><span></span><span></span></div>`}
   `;
   return rows;
 }
@@ -1379,14 +1141,32 @@ async function loadEngineSnapshot() {
     engineSnapshot = await response.json();
     $("#engine-status").textContent = engineSnapshot.mode || "API live";
   } catch {
-    engineSnapshot = localEngineSnapshot();
-    $("#engine-status").textContent = "Local mode";
+    engineSnapshot = {
+      mode: "manual mode",
+      message: "Live provider not connected. Using manual mode.",
+      providers: {},
+      top_bets: [],
+      all_bets: [],
+      parlay: [],
+      insights: [],
+      first_shot: {}
+    };
+    $("#engine-status").textContent = "Manual mode";
   }
   renderEngine();
 }
 
 function renderEngine() {
-  const snapshot = engineSnapshot || localEngineSnapshot();
+  const snapshot = engineSnapshot || {
+    mode: "manual mode",
+    message: "Live provider not connected. Using manual mode.",
+    providers: {},
+    top_bets: [],
+    all_bets: [],
+    events: [],
+    insights: [],
+    first_shot: {}
+  };
   const topBets = snapshot.top_bets?.length ? snapshot.top_bets : snapshot.all_bets?.slice(0, 5) || [];
   const events = snapshot.events || [];
   const providers = snapshot.providers || {};

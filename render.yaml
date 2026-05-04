@@ -1,11 +1,25 @@
 services:
   - type: web
-    name: edgelab-sports-intelligence
+    name: sporting-edge
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: ODDS_API_KEY
+        sync: false
+      - key: API_SPORTS_KEY
+        sync: false
+      - key: SPORTS_GAME_ODDS_KEY
+        sync: false
+      - key: SPORTSDATA_API_KEY
+        sync: false
+      - key: OPTICODDS_API_KEY
+        sync: false
+      - key: DRAFTKINGS_AFFILIATE_LINK
+        sync: false
+      - key: FANDUEL_AFFILIATE_LINK
         sync: false

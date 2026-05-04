@@ -1,0 +1,161 @@
+.markets-terminal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 24px;
+  align-items: start;
+}
+
+.markets-main,
+.betslip-panel,
+.market-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.markets-main,
+.betslip-panel {
+  padding: 24px;
+}
+
+.markets-header,
+.betslip-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.markets-header h2,
+.betslip-head h2 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 46px);
+}
+
+.markets-kicker {
+  margin: 0 0 6px;
+  color: #087f5b;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.markets-toolbar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.markets-toolbar input,
+.markets-toolbar select,
+.betslip-stake input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 48px;
+  padding: 0 14px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+}
+
+.markets-status {
+  color: var(--muted);
+  margin: 10px 0 18px;
+}
+
+.markets-list {
+  display: grid;
+  gap: 12px;
+}
+
+.market-card {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.market-title {
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.market-meta {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.market-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.markets-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(8, 127, 91, .12);
+  color: #073b2e;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.markets-pill.gold {
+  background: rgba(212, 175, 55, .2);
+  color: #5c4500;
+}
+
+.add-market-leg,
+.mini-btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: #087f5b;
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.empty-market-state {
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+body.theme-night .markets-pill {
+  color: #dffcef;
+  background: rgba(29, 185, 84, .18);
+}
+
+body.theme-night .markets-pill.gold {
+  color: #ffe9a3;
+  background: rgba(212, 175, 55, .18);
+}
+
+@media (max-width: 1100px) {
+  .markets-terminal {
+    grid-template-columns: 1fr;
+  }
+
+  .markets-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .market-card {
+    grid-template-columns: 1fr;
+  }
+
+  .market-tags {
+    justify-content: flex-start;
+  }
+}

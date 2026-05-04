@@ -18,8 +18,20 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+from app.routes.betslip import router as betslip_router
+from app.routes.community import router as community_router
+from app.routes.intelligence import router as intelligence_router
+from app.routes.live_simulator import router as live_simulator_router
+from app.routes.markets import router as markets_router
+from app.routes.parlay_workbench import router as parlay_workbench_router
+from app.routes.sharp_terminal import router as sharp_terminal_router
+from app.routes.simulator import router as simulator_router
+from odds_parlay_routes import router as odds_parlay_router
 
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 SQLITE_DEFAULT = Path("/tmp/edgelab.db") if os.getenv("RENDER") else BASE_DIR / "edgelab.db"
 SQLITE_PATH = Path(os.getenv("SQLITE_PATH", SQLITE_DEFAULT))
@@ -31,6 +43,15 @@ except Exception:  # psycopg is optional locally; Render can install it for Post
 
 app = FastAPI(title="EdgeLab Sports Engine")
 app.mount("/static", StaticFiles(directory=BASE_DIR), name="static")
+app.include_router(simulator_router)
+app.include_router(parlay_workbench_router)
+app.include_router(intelligence_router)
+app.include_router(odds_parlay_router)
+app.include_router(live_simulator_router)
+app.include_router(sharp_terminal_router)
+app.include_router(community_router)
+app.include_router(markets_router)
+app.include_router(betslip_router)
 
 SIM_RUNS = 4000
 EDGE_THRESHOLD = 0.05

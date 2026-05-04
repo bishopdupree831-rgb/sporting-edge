@@ -989,8 +989,97 @@ dialog::backdrop {
     grid-template-columns: 1fr;
   }
 
-  .mini-btn,
-  .mini-input {
-    min-height: 42px;
-  }
+.mini-btn,
+.mini-input {
+  min-height: 42px;
+}
+}
+
+.master-panel {
+  margin-top: 24px;
+}
+
+.sim-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.sim-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.sim-grid input,
+.sim-grid select {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+#run-full-simulator {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 18px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 900;
+}
+
+.result-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--panel);
+}
+
+.result-card > strong,
+.result-card > span,
+.result-card p {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.live-sim-panel {
+  margin-top: 24px;
+  border-color: rgba(200, 155, 44, 0.45);
+  background: linear-gradient(135deg, rgba(10, 109, 61, 0.06), rgba(200, 155, 44, 0.1));
+}
+
+.live-sim-result {
+  margin-top: 16px;
+}
+
+.sim-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.sim-result-grid div,
+.trend-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--panel);
+}
+
+.sim-result-grid span,
+.trend-card small {
+  display: block;
+  color: var(--muted);
+}
+
+.warning {
+  border-left: 4px solid var(--gold);
+  padding: 8px 10px;
+  background: rgba(200, 155, 44, 0.12);
 }

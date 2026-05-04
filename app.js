@@ -236,11 +236,28 @@ const quickPrompts = [
 ];
 
 const titles = {
+  dashboard: "Find the Best Betting Edge Tonight",
+  nba: "NBA Edge Board",
+  nfl: "NFL Matchup Edge Board",
+  mlb: "MLB Diamond Edge",
+  nhl: "NHL Ice Edge",
+  mma: "MMA Fight Edge",
+  "live-simulator": "Live Simulator",
   research: "Ask a sports research question",
   insights: "Curated daily edges",
   players: "Player profiles",
   profile: "Your profile and tracked research",
   parlay: "Parlay builder",
+  markets: "Sportsbook markets",
+  betslip: "Betslip Builder",
+  "ev-feed": "+EV Feed",
+  arbitrage: "Arbitrage",
+  "line-movement": "Line Movement",
+  sharp: "Sharp terminal",
+  community: "Community picks",
+  "bet-tracker": "Bet Tracker",
+  bankroll: "Bankroll",
+  alerts: "Alerts",
   rankings: "Prop-centric rankings",
   engine: "Live betting engine",
   analytics: "Analytics dashboard"
@@ -517,6 +534,129 @@ async function postJson(path, body = {}) {
   if (!response.ok || data.ok === false) throw new Error(data.error || "Request failed");
   return data;
 }
+
+async function apiPost(path, body = {}) {
+  return postJson(path, body);
+}
+
+function renderSimulatorResult(result) {
+  const target = $("#simulator-result");
+  if (!target) return;
+  if (!result) {
+    target.innerHTML = "";
+    return;
+  }
+  target.innerHTML = `
+    <div class="result-card">
+      <strong>${result.player || "Selected prop"} ${result.market || ""}</strong>
+      <span>${result.sport || ""} line ${result.line ?? ""} odds ${result.odds ?? ""}</span>
+      <div class="metric-row"><span>Projection</span><strong>${result.projection ?? "-"}</strong></div>
+      <div class="metric-row"><span>True probability</span><strong>${Math.round((result.true_probability || 0) * 100)}%</strong></div>
+      <div class="metric-row"><span>Edge</span><strong>${Math.round((result.edge || 0) * 1000) / 10}%</strong></div>
+      <div class="metric-row"><span>Confidence</span><strong>${Math.round((result.confidence || 0) * 100)}%</strong></div>
+      <p>${result.recommendation || result.confidence_tier || "Research output ready."}</p>
+    </div>
+  `;
+}
+
+async function runFullPropSimulator() {
+  const enteredName = $("#sim-player")?.value || "Selected player";
+  const existing = players.find((item) => item.name.toLowerCase() === enteredName.toLowerCase());
+  const body = {
+    player: enteredName,
+    sport: $("#sim-sport")?.value || activeSport || "NBA",
+    market: $("#sim-market")?.value || "Points",
+    line: Number($("#sim-line")?.value || 0),
+    odds: Number($("#sim-odds")?.value || -110),
+    recent: existing?.recent || null
+  };
+  try {
+    const result = await apiPost("/api/projection", body);
+    renderSimulatorResult(result);
+  } catch (error) {
+    $("#simulator-result").innerHTML = `<div class="result-card"><strong>Simulator error</strong><p>${error.message}</p></div>`;
+  }
+}
+
+window.runFullPropSimulator = runFullPropSimulator;
+
+function renderLiveSimulation(result) {
+  const target = $("#live-sim-output");
+  if (!target) return;
+  const provider = result.provider_message ? `<p class="warning">${result.provider_message}</p>` : "";
+  target.innerHTML = `
+    <article class="result-card live-sim-result">
+      <div class="card-top">
+        <div>
+          <strong>${result.result_sentence}</strong>
+          <span>${result.sport} - ${result.market_type} - ${result.sportsbook || "sportsbook not entered"}</span>
+        </div>
+        <span class="pill">${result.confidence_grade} grade</span>
+      </div>
+      ${provider}
+      <div class="sim-result-grid">
+        <div><span>Hit</span><strong>${Math.round(result.hit_percentage * 1000) / 10}%</strong></div>
+        <div><span>Miss</span><strong>${Math.round(result.miss_percentage * 1000) / 10}%</strong></div>
+        <div><span>Avg result</span><strong>${result.average_result}</strong></div>
+        <div><span>Median</span><strong>${result.median_result}</strong></div>
+        <div><span>25th / 75th</span><strong>${result.percentile_25} / ${result.percentile_75}</strong></div>
+        <div><span>Implied</span><strong>${Math.round(result.implied_probability * 1000) / 10}%</strong></div>
+        <div><span>Model edge</span><strong>${Math.round(result.model_edge * 1000) / 10}%</strong></div>
+        <div><span>EV</span><strong>${result.expected_value}</strong></div>
+      </div>
+      <div class="trend-card">
+        <strong>${result.betting_verdict}</strong>
+        <p>${result.trend_explanation}</p>
+        <small>Freshness: ${new Date(result.data_freshness).toLocaleString()} - Sources: ${result.provider_sources.map((source) => source.name).join(", ")}</small>
+      </div>
+    </article>
+  `;
+}
+
+async function runLiveSimulator() {
+  const sport = $("#live-sim-sport")?.value || "NBA";
+  const marketType = $("#live-sim-market-type")?.value || "player_prop";
+  const subject = $("#live-sim-subject")?.value.trim() || "";
+  const body = {
+    sport,
+    matchup: $("#live-sim-matchup")?.value.trim() || null,
+    market_type: marketType,
+    player_name: marketType.includes("player") || marketType.includes("fighter") || marketType.startsWith("first") ? subject : null,
+    team_name: marketType.includes("team") || ["moneyline", "spread", "total"].includes(marketType) ? subject : null,
+    stat_type: $("#live-sim-stat")?.value.trim() || marketType,
+    line: Number($("#live-sim-line")?.value || 0),
+    odds: Number($("#live-sim-odds")?.value || -110),
+    sportsbook: $("#live-sim-book")?.value.trim() || null,
+    simulations: 10000,
+    live_context: {
+      season_average: Number($("#live-sim-season")?.value || $("#live-sim-line")?.value || 0),
+      last_5_average: Number($("#live-sim-l5")?.value || $("#live-sim-line")?.value || 0),
+      last_10_average: Number($("#live-sim-l10")?.value || $("#live-sim-line")?.value || 0),
+      opponent_average_allowed: Number($("#live-sim-opp")?.value || $("#live-sim-line")?.value || 0),
+      usage_rate: 0,
+      injury_adjustment: 0,
+      lineup_adjustment: 0,
+      pace_adjustment: 0,
+      weather_adjustment: 0,
+      pitcher_adjustment: 0,
+      goalie_adjustment: 0,
+      fight_style_adjustment: 0,
+      odds_movement: 0,
+      public_betting_percentage: 50,
+      sharp_money_signal: ""
+    }
+  };
+  const output = $("#live-sim-output");
+  if (output) output.innerHTML = '<article class="result-card"><strong>Running 10,000 simulations...</strong></article>';
+  try {
+    const result = await apiPost("/api/live-simulate", body);
+    renderLiveSimulation(result);
+  } catch (error) {
+    if (output) output.innerHTML = `<article class="result-card"><strong>Simulation error</strong><p>${error.message}</p></article>`;
+  }
+}
+
+window.runLiveSimulator = runLiveSimulator;
 
 async function loadCurrentUser() {
   if (!authToken) {
@@ -1592,9 +1732,13 @@ async function forceRefreshFeeds() {
 function switchView(view) {
   $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   $$(".view").forEach((section) => section.classList.toggle("active", section.id === view));
-  $("#view-title").textContent = titles[view];
+  $("#view-title").textContent = titles[view] || "Sporting Edge";
+  document.body.classList.toggle("show-slip-rail", view === "betslip" || view === "markets");
+  document.querySelectorAll(".mobile-bottom-nav button").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   if (view === "profile") renderProfile();
   if (view === "analytics") renderAnalytics();
+  if (view === "markets") window.SEMarkets?.init?.();
+  if (view === "betslip") window.SEBetSlip?.render?.();
 }
 
 function refreshAll() {
@@ -1695,6 +1839,8 @@ $("#custom-name").addEventListener("input", () => {
 $("#custom-sport").addEventListener("change", searchLivePlayers);
 $("#prediction-form").addEventListener("submit", submitPrediction);
 $("#theme-toggle")?.addEventListener("click", toggleTheme);
+$("#run-full-simulator")?.addEventListener("click", runFullPropSimulator);
+$("#run-live-simulator")?.addEventListener("click", runLiveSimulator);
 $("#refresh-btn").addEventListener("click", () => {
   Promise.all([loadRankingsData(false), loadLiveInsights(), loadEngineSnapshot(), loadAnalytics(), loadMarketSources()])
     .finally(refreshAll);

@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EdgeLab Sports Intelligence</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/static/static/parlay_workbench.css" />
+    <link rel="stylesheet" href="/static/static/statmuse_rotowire_widget.css" />
+    <link rel="stylesheet" href="/static/static/odds_parlay_cards.css" />
+    <link rel="stylesheet" href="/static/static/sharp_terminal.css" />
+    <link rel="stylesheet" href="/static/static/community.css" />
+    <link rel="stylesheet" href="/static/static/markets.css" />
+    <link rel="stylesheet" href="/static/static/betslip.css" />
+    <link rel="stylesheet" href="/static/static/theme.css" />
+    <link rel="stylesheet" href="/static/static/dashboard.css" />
+    <link rel="stylesheet" href="/static/static/sport_pages.css" />
+    <link rel="stylesheet" href="/static/static/player_cards.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -32,6 +43,15 @@
           </button>
           <button class="nav-item" data-view="parlay" title="Parlay Builder">
             <span>＋</span> Parlay Builder
+          </button>
+          <button class="nav-item" data-view="markets" title="Sportsbook Markets">
+            <span>MK</span> Sportsbook Markets
+          </button>
+          <button class="nav-item" data-view="sharp" title="Sharp Terminal">
+            <span>ST</span> Sharp Terminal
+          </button>
+          <button class="nav-item" data-view="community" title="Community Picks">
+            <span>CP</span> Community Picks
           </button>
           <button class="nav-item" data-view="rankings" title="Rankings">
             <span>⇅</span> Rankings
@@ -130,6 +150,85 @@
           <datalist id="team-suggestions"></datalist>
           <datalist id="market-suggestions"></datalist>
           <section id="prediction-output" class="prediction-output"></section>
+
+          <section id="live-simulator-panel" class="prediction-form live-sim-panel">
+            <div>
+              <h2>Universal live prop simulator</h2>
+              <p class="muted">Run NBA, NFL, MLB, NHL, and MMA markets with manual inputs or provider-enriched context when API keys are connected.</p>
+            </div>
+            <div class="form-grid prediction-grid">
+              <label>
+                Sport
+                <select id="live-sim-sport">
+                  <option value="NBA">NBA</option>
+                  <option value="NFL">NFL</option>
+                  <option value="MLB">MLB</option>
+                  <option value="NHL">NHL</option>
+                  <option value="MMA">MMA</option>
+                </select>
+              </label>
+              <label>
+                Market type
+                <select id="live-sim-market-type">
+                  <option value="player_prop">Player prop</option>
+                  <option value="team_prop">Team prop</option>
+                  <option value="fighter_prop">Fighter prop</option>
+                  <option value="moneyline">Moneyline</option>
+                  <option value="spread">Spread</option>
+                  <option value="total">Total</option>
+                  <option value="period_prop">Period prop</option>
+                  <option value="quarter_prop">Quarter prop</option>
+                  <option value="inning_prop">Inning prop</option>
+                  <option value="first_basket">First basket</option>
+                  <option value="first_scorer">First scorer</option>
+                  <option value="first_td">First TD</option>
+                  <option value="first_hr">First HR</option>
+                </select>
+              </label>
+              <label>
+                Player/team
+                <input id="live-sim-subject" placeholder="Jalen Brunson or Celtics" />
+              </label>
+              <label>
+                Matchup
+                <input id="live-sim-matchup" placeholder="NYK vs IND" />
+              </label>
+              <label>
+                Stat type
+                <input id="live-sim-stat" placeholder="Assists, yards, shots..." />
+              </label>
+              <label>
+                Line
+                <input id="live-sim-line" type="number" step="0.5" value="6.5" />
+              </label>
+              <label>
+                Odds
+                <input id="live-sim-odds" type="number" step="1" value="-110" />
+              </label>
+              <label>
+                Sportsbook
+                <input id="live-sim-book" placeholder="DraftKings, FanDuel..." />
+              </label>
+              <label>
+                Season avg
+                <input id="live-sim-season" type="number" step="0.1" placeholder="6.1" />
+              </label>
+              <label>
+                Last 5 avg
+                <input id="live-sim-l5" type="number" step="0.1" placeholder="7.2" />
+              </label>
+              <label>
+                Last 10 avg
+                <input id="live-sim-l10" type="number" step="0.1" placeholder="6.8" />
+              </label>
+              <label>
+                Opp allowed
+                <input id="live-sim-opp" type="number" step="0.1" placeholder="7.0" />
+              </label>
+            </div>
+            <button id="run-live-simulator" type="button">Run live simulation</button>
+            <section id="live-sim-output" class="prediction-output"></section>
+          </section>
 
           <div class="research-grid">
             <section class="chat-panel">
@@ -289,6 +388,18 @@
           </div>
         </section>
 
+        <section id="markets" class="view">
+          <div id="sportsbook-markets-root"></div>
+        </section>
+
+        <section id="sharp" class="view">
+          <div id="sharp-terminal-root"></div>
+        </section>
+
+        <section id="community" class="view">
+          <div id="community-picks-root"></div>
+        </section>
+
         <section id="rankings" class="view">
           <div class="rankings-head">
             <h2>Live-ranked betting board</h2>
@@ -342,6 +453,43 @@
               <div id="owner-controls" class="engine-list"></div>
             </section>
           </div>
+          <section id="full-simulator-panel" class="engine-panel master-panel">
+            <h2>Full simulator workbench</h2>
+            <p class="muted">Run true probability, EV, confidence tier, and bankroll sizing checks from the production simulator API.</p>
+            <div class="sim-grid">
+              <label>
+                Player/team
+                <input id="sim-player" value="Jalen Brunson" />
+              </label>
+              <label>
+                Sport
+                <select id="sim-sport">
+                  <option>NBA</option>
+                  <option>NFL</option>
+                  <option>MLB</option>
+                  <option>NHL</option>
+                  <option>MMA</option>
+                </select>
+              </label>
+              <label>
+                Market
+                <input id="sim-market" value="Points" />
+              </label>
+              <label>
+                Line
+                <input id="sim-line" type="number" step="0.5" value="27.5" />
+              </label>
+              <label>
+                Odds
+                <input id="sim-odds" type="number" step="1" value="-110" />
+              </label>
+            </div>
+            <button id="run-full-simulator" type="button">Run simulator</button>
+            <div id="simulator-result" class="engine-list"></div>
+          </section>
+          <div id="se-intelligence-root"></div>
+          <div id="sporting-edge-parlay-workbench"></div>
+          <div id="odds-parlay-dashboard"></div>
         </section>
       </main>
     </div>
@@ -351,6 +499,16 @@
       <div id="dialog-content"></div>
     </dialog>
 
+    <script src="/static/static/parlay_workbench.js"></script>
+    <script src="/static/static/statmuse_rotowire_widget.js"></script>
+    <script src="/static/static/odds_parlay_cards.js"></script>
+    <script src="/static/static/sharp_terminal.js"></script>
+    <script src="/static/static/community.js"></script>
+    <script src="/static/static/team_assets.js"></script>
+    <script src="/static/static/player_assets.js"></script>
+    <script src="/static/static/dashboard_layout.js"></script>
+    <script src="/static/static/markets.js"></script>
+    <script src="/static/static/betslip.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

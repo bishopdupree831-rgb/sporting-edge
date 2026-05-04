@@ -1,0 +1,138 @@
+.betslip-stake {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+.betslip-legs {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.betslip-leg {
+  position: relative;
+  padding: 14px 42px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(8, 127, 91, .04);
+}
+
+.betslip-leg strong,
+.betslip-leg span {
+  display: block;
+}
+
+.betslip-leg span {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.remove-slip-leg {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.betslip-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.betslip-metric {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(212, 175, 55, .08);
+}
+
+.betslip-metric span,
+.betslip-metric strong {
+  display: block;
+}
+
+.betslip-metric span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.betslip-metric strong {
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.betslip-warning {
+  margin: 10px 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(212, 175, 55, .2);
+  color: #463500;
+  font-weight: 800;
+}
+
+.betslip-warning.soft {
+  background: rgba(8, 127, 91, .1);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.betslip-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.betslip-actions button,
+.book-links a {
+  border: 0;
+  border-radius: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: #087f5b;
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+}
+
+.book-links {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.betslip-export {
+  width: 100%;
+  min-height: 180px;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--card);
+  color: var(--text);
+}
+
+body.theme-night .betslip-warning {
+  color: #ffe9a3;
+  background: rgba(212, 175, 55, .16);
+}
+
+@media (max-width: 600px) {
+  .betslip-metrics,
+  .betslip-actions {
+    grid-template-columns: 1fr;
+  }
+}

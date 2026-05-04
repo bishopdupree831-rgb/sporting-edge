@@ -1,0 +1,1 @@
+"""Sporting Edge application modules."""
